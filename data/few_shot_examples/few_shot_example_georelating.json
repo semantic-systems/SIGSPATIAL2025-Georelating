@@ -1,0 +1,54 @@
+{
+  "article text": "A fast-moving wildfire erupted in Southern California on Wednesday, destroying homes and sending firefighters rushing to get residents out of homes and to safety, officials said. \\nThe Mountain Fire in Ventura County prompted evacuation orders and grew to over 14,000 acres, fueled by what fire officials called a significant Santa Ana wind event. \\nFirefighters at the scene of the brush fire, which broke out between the communities of Moorpark and Somis, “were faced with a tough firefight,” Ventura County Fire Capt. Trevor Johnson said. \\n“Firefighters were right off the bat engaged in pulling people out of their houses and saving lives,” Johnson said. \\nThe fire was moving so fast that firefighters drove residents out of the area in fire engines because of the danger, he said. \\nThe fire department did not have a count for the number of destroyed structures. The fire began at 8:51 a.m. local time, said the California Department of Forestry and Fire Protection, known as Cal Fire. It was 0% contained Wednesday afternoon, and what sparked it was under investigation.",
+  "mentioned toponyms with coordinates": [
+      {
+          "toponym": "Southern California",
+          "coordinates": {
+              "latitude": "34.68743",
+              "longitude": "-116.78467"
+          }
+      },
+      {
+          "toponym": "Ventura County",
+          "coordinates": {
+              "latitude": "34.35753",
+              "longitude": "-119.12603"
+          }
+      },
+      {
+          "toponym": "Santa Ana",
+          "coordinates": {
+              "latitude": "33.74557",
+              "longitude": "-117.86783"
+          }
+      },
+      {
+          "toponym": "Moorpark",
+          "coordinates": {
+              "latitude": "34.28556",
+              "longitude": "-118.88204"
+          }
+      },
+      {
+          "toponym": "Somis",
+          "coordinates": {
+              "latitude": "34.25723",
+              "longitude": "-118.99621"
+          }
+      },
+      {
+          "toponym": "Ventura County",
+          "coordinates": {
+              "latitude": "34.35753",
+              "longitude": "-119.12603"
+          }
+      }
+  ],
+  "output": {
+    "center coordinates of affected area": {
+        "latitude": 34.2714,
+        "longitude": -118.9393
+    },
+    "affected area in square km": 56.7
+  }
+}

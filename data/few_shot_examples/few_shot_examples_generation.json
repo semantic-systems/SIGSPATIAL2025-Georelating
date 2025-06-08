@@ -1,0 +1,638 @@
+[
+  {
+    "docid": "40450848",
+    "ground_truth": [
+      {
+        "toponym": "Alexandria",
+        "params": {
+          "q": "Alexandria Rapides Parish",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Alexandria",
+        "duplicate_of": "Alexandria"
+      },
+      {
+        "toponym": "Rapides Parish",
+        "params": {
+          "q": "Rapides Parish",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      }
+    ]
+  },
+  {
+    "docid": "41383748",
+    "ground_truth": [
+      {
+        "toponym": "Avoyelles",
+        "params": {
+          "q": "Avoyelles Avoyelles Parish",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Cottonport",
+        "params": {
+          "q": "Cottonport Avoyelles Parish",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Cottonport",
+        "duplicate_of": "Cottonport"
+      },
+      {
+        "toponym": "Avoyelles Parish",
+        "duplicate_of": "Avoyelles"
+      }
+    ]
+  },
+  {
+    "docid": "41406650",
+    "ground_truth": [
+      {
+        "toponym": "Alexandria",
+        "params": {
+          "q": "Alexandria",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 20,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Alexandria",
+        "duplicate_of": "Alexandria"
+      },
+      {
+        "toponym": "Alexandria",
+        "duplicate_of": "Alexandria"
+      },
+      {
+        "toponym": "Alexandria",
+        "duplicate_of": "Alexandria"
+      }
+    ]
+  },
+  {
+    "docid": "41650539",
+    "ground_truth": [
+      {
+        "toponym": "Pointe Coupee",
+        "params": {
+          "q": "Pointe Coupee",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Pointe Coupee",
+        "duplicate_of": "Pointe Coupee"
+      }
+    ]
+  },
+  {
+    "docid": "41662232",
+    "ground_truth": [
+      {
+        "toponym": "Pineville",
+        "params": {
+          "q": "Pineville Lakeview and Harrison Streets",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      }
+    ]
+  },
+    {
+    "docid": "41662233",
+    "ground_truth": [
+      {
+        "toponym": "Mansfield",
+        "params": {
+          "q": "Mansfield Shreveport",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "MANSFIELD",
+        "duplicate_of": "Mansfield"
+      },
+      {
+        "toponym": "Mansfield",
+        "duplicate_of": "Mansfield"
+      },
+      {
+        "toponym": "Mansfield",
+        "duplicate_of": "Mansfield"
+      },
+      {
+        "toponym": "Shreveport",
+        "params": {
+          "q": "Shreveport",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Mansfield",
+        "duplicate_of": "Mansfield"
+      },
+      {
+        "toponym": "Shreveport",
+        "duplicate_of": "Shreveport"
+      },
+      {
+        "toponym": "Shreveport",
+        "duplicate_of": "Shreveport"
+      },
+      {
+        "toponym": "Shreveport",
+        "duplicate_of": "Shreveport"
+      },
+      {
+        "toponym": "Mansfield",
+        "duplicate_of": "Mansfield"
+      },
+      {
+        "toponym": "Mansfield",
+        "duplicate_of": "Mansfield"
+      },
+      {
+        "toponym": "Mansfield",
+        "duplicate_of": "Mansfield"
+      }
+    ]
+  },
+  {
+    "docid": "38563537",
+    "ground_truth": [
+      {
+        "toponym": "Cook",
+        "params": {
+          "q": "Cook Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Minneapolis",
+        "params": {
+          "q": "Minneapolis Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Minnesota",
+        "params": {
+          "q": "Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Minnesota",
+        "duplicate_of": "Minnesota"
+      },
+      {
+        "toponym": "Minnesota",
+        "duplicate_of": "Minnesota"
+      },
+      {
+        "toponym": "Minnesota",
+        "duplicate_of": "Minnesota"
+      },
+      {
+        "toponym": "Marshall",
+        "params": {
+          "q": "Marshall Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Elbow Lake",
+        "params": {
+          "q": "Elbow Lake Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      }
+    ]
+  },
+  {
+    "docid": "41444350",
+    "ground_truth": [
+      {
+        "toponym": "Mahnomen",
+        "params": {
+          "q": "Mahnomen Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Twin Lakes",
+        "params": {
+          "q": "Twin Lakes Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Perham",
+        "params": {
+          "q": "Perham Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Otter Tail County",
+        "params": {
+          "q": "Otter Tail County Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Pelican Rapids",
+        "params": {
+          "q": "Pelican Rapids Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Star Lake",
+        "params": {
+          "q": "Star Lake Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Douglas County",
+        "params": {
+          "q": "Douglas County Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Kent",
+        "params": {
+          "q": "Kent Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Minnesota",
+        "params": {
+          "q": "Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+          "toponym": "Minnesota",
+          "duplicate_of": "Minnesota"
+      },
+      {
+        "toponym": "Becker",
+        "params": {
+          "q": "Becker County Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Clay",
+        "params": {
+          "q": "Clay County Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Douglas",
+        "duplicate_of": "Douglas County"
+      },
+      {
+        "toponym": "Grant",
+        "params": {
+          "q": "Grant County Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Mahnomen",
+        "params": {
+          "q": "Mahnomen County Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Otter Tail",
+        "duplicate_of": "Otter Tail County"
+      },
+      {
+        "toponym": "Swift",
+        "params": {
+          "q": "Swift County Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Wilkin",
+        "params": {
+          "q": "Wilkin County Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      }
+    ]
+  },
+  {
+    "docid": "41740819",
+    "ground_truth": [
+      {
+        "toponym": "Parkers Prairie",
+        "params": {
+          "q": "Parkers Prairie Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Parkers Prairie",
+        "duplicate_of": "Parkers Prairie"
+      },
+      {
+        "toponym": "Parkers Prairie",
+        "duplicate_of": "Parkers Prairie"
+      },
+      {
+        "toponym": "Minnesota",
+        "params": {
+          "q": "Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      }
+    ]
+  },
+    {
+    "docid": "41740820",
+    "ground_truth": [
+      {
+        "toponym": "Fargo",
+        "params": {
+          "q": "Fargo North Dakota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Alexandria",
+        "params": {
+          "q": "Alexandria",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 20,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Red River Fargo",
+        "params": {
+          "q": "Red River",
+          "featureCode": "STM",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 20,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      },
+      {
+        "toponym": "Moorhead",
+        "params": {
+          "q": "Moorhead Fargo",
+          "featureCode": "STM",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Red River",
+        "duplicate_of": "Red River"
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      },
+      {
+        "toponym": "Nebraska",
+        "params": {
+          "q": "Nebraska",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      },
+      {
+        "toponym": "Iraq",
+        "params": {
+          "q": "Iraq",
+          "continent": "AS",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Afghanistan",
+        "params": {
+          "q": "Afghanistan",
+          "continent": "AS",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "North Dakota",
+        "params": {
+          "q": "North Dakota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Oakport Township",
+        "params": {
+          "q": "Oakport Township",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Moorhead",
+        "duplicate_of": "Moorhead"
+      },
+      {
+        "toponym": "Red River",
+        "duplicate_of": "Red River"
+      },
+      {
+        "toponym": "Minnesota",
+        "params": {
+          "q": "Minnesota",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Oakport",
+        "params": {
+          "q": "Oakport",
+          "country": "US",
+          "isNameRequired": true,
+          "maxRows": 10,
+          "type": "json"
+        }
+      },
+      {
+        "toponym": "Moorhead",
+        "duplicate_of": "Moorhead"
+      },
+      {
+        "toponym": "Minnesota",
+        "duplicate_of": "Minnesota"
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      },
+      {
+        "toponym": "Red River",
+        "duplicate_of": "Red River"
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      },
+      {
+        "toponym": "Fargo",
+        "duplicate_of": "Fargo"
+      }
+    ]
+  }
+]

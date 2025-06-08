@@ -1,0 +1,128 @@
+{
+    "title": "Alexandria woman charged in connection with Kelleyland fire",
+    "news_article": "Alexandria woman charged in connection with Kelleyland fire. Chiquita Raquel Henry, 19, of 1935 Orchard St., Alexandria, was arrested and charged with aggravated arson and unauthorized entry of an inhabited dwelling. Both the Sheriff’s Office and Rapides Parish Fire District 2 investigated the March 7 fire at 6016 Dublin Road that led to Henry’s arrest. According to the Sheriff’s Office, the man who lives in the mobile home at that address was inside the home when Henry came in and set the bed and couch on fire with a lighter. The man only knew the woman by a nickname but investigation led detectives to Henry.",
+    "toponyms_with_candidates": [
+      {
+        "toponym": "Alexandria",
+        "candidates": [
+          {
+            "adminName1": "Louisiana",
+            "countryName": "United States",
+            "fclName": "city, village,...",
+            "fcodeName": "seat of a second-order administrative division",
+            "geonameId": 4314550,
+            "lat": "31.31129",
+            "lng": "-92.44514",
+            "name": "Alexandria",
+            "population": 47889,
+            "toponymName": "Alexandria"
+          },
+          {
+            "adminName1": "Louisiana",
+            "countryName": "United States",
+            "fclName": "country, state, region,...",
+            "fcodeName": "second-order administrative division",
+            "geonameId": 4338356,
+            "lat": "31.19862",
+            "lng": "-92.5332",
+            "name": "Rapides",
+            "population": 131613,
+            "toponymName": "Rapides Parish"
+          },
+          {
+            "adminName1": "Louisiana",
+            "countryName": "United States",
+            "fclName": "spot, building, farm",
+            "fcodeName": "airport",
+            "geonameId": 8113669,
+            "lat": "31.32243",
+            "lng": "-92.5429",
+            "name": "Alexandria International Airport",
+            "population": 0,
+            "toponymName": "Alexandria International Airport"
+          },
+          {"...": "..."
+          }
+        ]
+      },
+      {
+        "toponym": "Alexandria",
+        "candidates": [
+          {
+            "adminName1": "Louisiana",
+            "countryName": "United States",
+            "fclName": "city, village,...",
+            "fcodeName": "seat of a second-order administrative division",
+            "geonameId": 4314550,
+            "lat": "31.31129",
+            "lng": "-92.44514",
+            "name": "Alexandria",
+            "population": 47889,
+            "toponymName": "Alexandria"
+          },
+          {"...": "..."
+          }
+        ]
+      },
+      {
+        "toponym": "Rapides Parish",
+        "candidates": [
+          {
+            "adminName1": "Louisiana",
+            "countryName": "United States",
+            "fclName": "country, state, region,...",
+            "fcodeName": "second-order administrative division",
+            "geonameId": 4338356,
+            "lat": "31.19862",
+            "lng": "-92.5332",
+            "name": "Rapides",
+            "population": 131613,
+            "toponymName": "Rapides Parish"
+          },
+          {
+            "adminName1": "Louisiana",
+            "countryName": "United States",
+            "fclName": "city, village,...",
+            "fcodeName": "populated place",
+            "geonameId": 4337291,
+            "lat": "31.3224",
+            "lng": "-92.4343",
+            "name": "Pineville",
+            "population": 14403,
+            "toponymName": "Pineville"
+          },
+          {
+            "adminName1": "Louisiana",
+            "countryName": "United States",
+            "fclName": "spot, building, farm",
+            "fcodeName": "building(s)",
+            "geonameId": 4338357,
+            "lat": "31.29657",
+            "lng": "-92.50375",
+            "name": "Rapides Parish Coliseum",
+            "population": 0,
+            "toponymName": "Rapides Parish Coliseum"
+          },
+          {"...": "..."
+          }
+        ]
+      }
+    ],
+    "ground_truth": [
+      {
+        "toponym": "Alexandria",
+        "reasoning": "The only candidate with the same name as the toponym in the article is the city of Alexandria in Louisiana, United States. Since it becomes clear from the article that a city is mentioned, the other parameters like fclName, population, etc. match this. The other toponyms are not relevant to the context of the article or too specific.",
+        "selected_candidate_geonameId": 4314550
+      },
+      {
+        "toponym": "Alexandria",
+        "reasoning": "The only candidate with the same name as the toponym in the article is the city of Alexandria in Louisiana, United States. Since it becomes clear from the article that a city is mentioned, the other parameters like fclName, population, etc. match this. The other toponyms are not relevant to the context of the article or too specific.",
+        "selected_candidate_geonameId": 4314550
+      },
+      {
+        "toponym": "Rapides Parish",
+        "reasoning": "The only candidate with the same name as the toponym in the article is the Rapides Parish in Louisiana, United States. From the article, we can conclude that Rapides Parish likely is a city or another form of administrative division, since the name occurs in the context of a fire department name. The other parameters like fclName, population, etc. fit to this administrative unit, while the other candidates are too specific or too broad.",
+        "selected_candidate_geonameId": 4338356
+      }
+    ]
+  }
