@@ -5,7 +5,7 @@ This repository contains the dataset and source code for the ACM SIGSPATIAL 2025
 GANDR is a silver-standard dataset of 2,000 synthetic disaster reports with annotated H3 DGGS cell indices and geospatial relations for the US and EU. 
 Please find it in the `data/` directory. In case you use the dataset, please cite the Zenodo entry:
 ```bibtex
-Moltzen, K., Usbeck, R., & Huang, J. (2025). GANDR: Georelating-Annotated Natural Disaster Reports [Data set]. Zenodo. https://doi.org/10.5281/zenodo.15612556
+Kai Moltzen, Junbo Huang, and Ricardo Usbeck. 2025. LLM Agents for Georelating - A New Task for Locating Events. In The 33rd ACM International Conference on Advances in Geographic Information Systems (SIGSPATIAL ’25), November 3–6, 2025, Minneapolis, MN, USA. ACM, New York, NY, USA, 4 pages. https://doi.org/10.1145/3748636.3762733
 ```
 
 ## Code usage
