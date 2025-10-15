@@ -1,16 +1,20 @@
 # LLM Agents for Georelating - A New Task for Locating Events
-This repository contains the dataset and source code for the ACM SIGSPATIAL 2025 submission "LLM Agents for Georelating - A New Task for Locating Events" by Moltzen, Huang and Usbeck.
-
-## GANDR: Georelating-annotated Natural Disaster Reports
-GANDR is a silver-standard dataset of 2,000 synthetic disaster reports with annotated H3 DGGS cell indices and geospatial relations for the US and EU. 
-Please find it in the `data/` directory. In case you use the dataset, please cite the Zenodo entry:
+This repository contains the dataset and source code for our ACM SIGSPATIAL 2025 research paper "LLM Agents for Georelating - A New Task for Locating Events" by Moltzen, Huang, and Usbeck. If you want to use our work, please cite it as stated below:
 ```bibtex
 Kai Moltzen, Junbo Huang, and Ricardo Usbeck. 2025. LLM Agents for Georelating - A New Task for Locating Events. In The 33rd ACM International Conference on Advances in Geographic Information Systems (SIGSPATIAL ’25), November 3–6, 2025, Minneapolis, MN, USA. ACM, New York, NY, USA, 4 pages. https://doi.org/10.1145/3748636.3762733
 ```
 
+## GANDR: Georelating-annotated Natural Disaster Reports
+GANDR is a silver-standard dataset of 2,000 synthetic disaster reports with annotated H3 DGGS cell indices and geospatial relations for the US and EU.
+Please find it in the `data/` directory. In case you use the dataset, please cite the GeoAI'25 Workshop paper in which we introduce the dataset, novel cell-based metrics, and conduct thorough evaluations:
+```bibtex
+Kai Moltzen and Ricardo Usbeck. 2025. GANDR - Georelating Dataset, Metrics, and Evaluation. In The 8th ACM SIGSPATIAL International Workshop on AI for Geographic Knowledge Discovery (GeoAI ’25), November 3–6, 2025, Minneapolis, MN, USA. ACM, New York, NY, USA, 11 pages. https://doi.org/10.1145/3764912.3770819
+```
+The dataset is also available on Zenodo: https://doi.org/10.5281/zenodo.15612556
+
 ## Code usage
 ### Preliminaries
-- Please ensure you have an envoronment file containing your API key for the LLM invocation `SAIA_API_KEY` and GeoNames API username `GEONAMES_USERNAME`.
+- Please ensure you have an environment file containing your API key for the LLM invocation `SAIA_API_KEY` and GeoNames API username `GEONAMES_USERNAME`.
 - In case you want to run the code to geocode the LGL corpus or GeoCoDe dataset, please download and save it to `data/`.
 ### Requirements
 This code was written in Python 3.12. To run the code, please install the requirements from `requirements.txt`:
