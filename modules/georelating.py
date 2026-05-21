@@ -16,6 +16,7 @@ from agent_components.llms.chatAI import ChatAIHandler
 from agent_components.environment.internal_tools import OutputParser
 from helpers.helpers import preprocess_data
 from models.candidates import CandidateGenerationState, GeoCodingState
+from models.errors import ExecutionStep
 from modules.reflective_geocoding import ReflectiveGeoCoder
 
 """
@@ -82,6 +83,14 @@ def configure_logging(logfilename):
 """
 Helpers
 """
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, ExecutionStep):
+            return obj.value
+        return super().default(obj)
+
+
 def extract_title_text_from_row(row):
     """
     Extracts the title and text from the 'disaster_news_article' column of a DataFrame row.
@@ -193,9 +202,14 @@ def georelate(model_name: str, long_term_memory, article_text: str, mentioned_to
     Returns:
         dict: The georelation result containing the geocoded toponyms and their coordinates.
     """
+    # Get project root directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    example_path = os.path.join(project_root, "data/few_shot_examples/few_shot_example_georelating.json")
+
     prompt = long_term_memory.generate_geoelation_prompt(article_text=article_text,
                                                           mentioned_toponyms=mentioned_toponyms,
-                                                          example_path=r"data/few_shot_example_georelating.json")
+                                                          example_path=example_path)
     handler = ChatAIHandler()
     model = handler.get_model(model_name)
     llm_answer = model.invoke(prompt)
@@ -288,10 +302,15 @@ def process_row_save_as_jsonl(row, geocoder, generation_agent_graph, resolution_
             candidate_resolution = GeoCodingState(**resolution_agent_graph_answer)
             geocoded_toponyms = extract_geocoded_toponyms(candidate_resolution)
 
+            # Get project root directory
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(script_dir)
+            example_path = os.path.join(project_root, "data/few_shot_examples/few_shot_example_georelating.json")
+
             prompt = geocoder.working_memory.long_term_memory.generate_georelating_prompt(
                 article_text=row['disaster_news_article_text'],
                 mentioned_toponyms=geocoded_toponyms,
-                example_path=r"data/few_shot_example_georelating.json"
+                example_path=example_path
             )
             llm_answer = safe_llm_call(geocoder.llm.invoke, prompt)
             cleaned_output = OutputParser.clean_and_parse_json_content(llm_answer.content, '{', '}')
@@ -307,7 +326,7 @@ def process_row_save_as_jsonl(row, geocoder, generation_agent_graph, resolution_
             # Save immediately, thread-safe
             with lock:
                 with open(output_path, "a", encoding="utf-8") as fout:
-                    fout.write(json.dumps(result) + "\n")
+                    fout.write(json.dumps(result, cls=CustomJSONEncoder) + "\n")
 
             logging.info(f"Completed and saved article {row['landmark_id']}")
             return result
@@ -333,7 +352,7 @@ def process_row_save_as_jsonl(row, geocoder, generation_agent_graph, resolution_
     # Save error result too
     with lock:
         with open(output_path, "a", encoding="utf-8") as fout:
-            fout.write(json.dumps(result) + "\n")
+            fout.write(json.dumps(result, cls=CustomJSONEncoder) + "\n")
 
     return result
 
@@ -407,11 +426,16 @@ if __name__ == "__main__":
 
     nlp = stanza.Pipeline(lang='en', processors='tokenize,ner')
 
-    actor = "llama-3.3-70b-instruct"
-    critic = "mistral-large-instruct"
+    actor = "meta-llama-3.1-8b-instruct"
+    critic = "meta-llama-3.1-8b-instruct"
     dataset = "New"
-    data_dir = "data"
-    output_dir = "output/georelating"
+
+    # Get the project root directory (parent of modules/)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+
+    data_dir = os.path.join(project_root, "data")
+    output_dir = os.path.join(project_root, "output/georelating")
     output_file = f"processed_{timestamp}_{data_file}l"
 
     data_path = os.path.join(data_dir, data_file)
@@ -433,6 +457,8 @@ if __name__ == "__main__":
 
     df = pd.read_json(data_path, orient='records')
 
+    df = df.head(3)
+
     df[['disaster_news_article_title', 'disaster_news_article_text']] = df.apply(extract_title_text_from_row, axis=1)
     df['toponyms'] = df['disaster_news_article_text'].apply(recognize_toponyms)
 
@@ -446,7 +472,7 @@ if __name__ == "__main__":
         on='landmark_id',
         how='left'
     )
-    merged_df['pred_cell'] = df.apply(safe_latlng_to_cell, axis=1)
+    merged_df['pred_cell'] = merged_df.apply(safe_latlng_to_cell, axis=1)
 
     output_merged_path = output_path.replace('.jsonl', '.json')
     merged_df.to_json(output_merged_path, orient="records", force_ascii=False, indent=4)

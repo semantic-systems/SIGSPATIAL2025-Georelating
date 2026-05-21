@@ -33,7 +33,7 @@ class CandidateGenerationMetrics(BaseModel):
         description="Number of toponyms for which too many toponym candidates were generated",
         default=0)
 
-    median_nof_candidates: np.floating = Field(description="Median number of candidates per toponym if candidates were found",
+    median_nof_candidates: float = Field(description="Median number of candidates per toponym if candidates were found",
                                       default=0)
     nof_articles_with_fatal_errors: int = Field(
         description="Number of articles for which a fatal error occurred during the candidate generation",
@@ -97,7 +97,8 @@ class CandidateGenerationEvaluator:
         generated_by_retry = 0
         article_with_critic = 0
 
-        self.data_handler.parse_xml("LGL_test.xml")
+        xml_path = os.path.join(self.data_directory, "LGL_test.xml")
+        self.data_handler.parse_xml(xml_path)
 
         # Iterate through generated candidate files
         for candidate_file in os.listdir(self.output_directory):
@@ -246,10 +247,12 @@ class CandidateGenerationEvaluator:
         nof_articles = 0
 
         if "GeoCoDe" in directory:
-            with open("data/processed_GeoCoDe_test.json", "r", encoding="utf-8") as f:
+            geocode_path = os.path.join(self.data_directory, "processed_GeoCoDe_test.json")
+            with open(geocode_path, "r", encoding="utf-8") as f:
                 geocode_articles = json.load(f)
         else:
-            self.data_handler.parse_xml("LGL_test.xml")
+            xml_path = os.path.join(self.data_directory, "LGL_test.xml")
+            self.data_handler.parse_xml(xml_path)
 
         # Iterate through generated candidate files
         for candidate_file in os.listdir(directory):

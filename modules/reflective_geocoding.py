@@ -1,7 +1,6 @@
 import json
 import pickle
 import os
-import time
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -557,7 +556,11 @@ class ReflectiveGeoCoder:
         os.makedirs(output_dir, exist_ok=True)
 
         if self.data_set == "GeoCoDe":
-            with open("data/processed_GeoCoDe_test.json", "r", encoding="utf-8") as f:
+            # Get project root directory
+            import subprocess
+            project_root = subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip().decode()
+            geocode_path = os.path.join(project_root, "data/processed_GeoCoDe_test.json")
+            with open(geocode_path, "r", encoding="utf-8") as f:
                 articles = json.load(f)
 
             # Modify the articles to exclude the explicit toponym the article is about from the text
@@ -605,8 +608,12 @@ class ReflectiveGeoCoder:
                              output_directory: str = ""):
         if not os.path.exists(input_directory):
             raise FileNotFoundError(f"Input directory {input_directory} does not exist.")
+        # Get project root directory
+        import subprocess
+        project_root = subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip().decode()
+        data_dir = os.path.join(project_root, 'data/')
         evaluator = CandidateGenerationEvaluator(output_directory=input_directory,
-                                                 data_directory='data/')
+                                                 data_directory=data_dir)
         os.makedirs(output_directory, exist_ok=True)
         for candidate_file in tqdm(os.listdir(input_directory), desc="Processing candidate files"):
             if not candidate_file.endswith(".pkl"):

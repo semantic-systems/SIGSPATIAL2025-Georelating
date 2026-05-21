@@ -169,7 +169,8 @@ def prepare_target_location_info(sample, rng):
         axis=1
     )
 
-    land_poly = gpd.read_file(f"{repo_root}/data/gandr_prelims/ne_10m_land") # Change for your path
+    land_poly_path = os.path.join(repo_root, "data/gandr_prelims/ne_10m_land")
+    land_poly = gpd.read_file(land_poly_path)
     def _is_on_land(longitude, latitude, land_poly):
         location_point = gpd.GeoSeries([Point(longitude, latitude)], crs="EPSG:4326")
         joined = gpd.sjoin(location_point.to_frame("geometry"), land_poly, predicate="within")

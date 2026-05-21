@@ -18,11 +18,13 @@ class ChatAIHandler:
     def __init__(self, base_url=BASE_URL):
         self.api_key = os.getenv('SAIA_API_KEY')
         self.base_url = base_url
+        # Store models file in modules directory where it's used
+        self.models_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "modules", "available_models.json")
         self.available_models = self._load_available_models()
 
     def _load_available_models(self):
-        if file_exists("available_models.json"):
-            with open("available_models.json", "r") as f:
+        if file_exists(self.models_file_path):
+            with open(self.models_file_path, "r") as f:
                 return json.load(f)
         else:
             return self.list_all_models()
@@ -41,7 +43,7 @@ class ChatAIHandler:
         if response.status_code == 200:
             models = response.json()
             all_models = [model_key["id"] for model_key in models["data"]]
-            with open("available_models.json", "w") as f:
+            with open(self.models_file_path, "w") as f:
                 json.dump(all_models, f)
             print("Available models are ", all_models)
             return all_models
@@ -63,7 +65,7 @@ class ChatAIHandler:
                               base_url=self.base_url,
                               max_retries=1,
                               timeout=httpx.Timeout(500.0),
-                              model_name=temperature,
+                              model_name=model_name,
                               temperature=0)
                               #top_p=top_p)
 
