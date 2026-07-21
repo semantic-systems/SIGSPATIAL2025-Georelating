@@ -13,6 +13,9 @@ class ExecutionStep(Enum):
     RESOLUTION_ACTOR = "resolution_actor"
     RESOLUTIONSYNTAXVALIDATOR = "resolution_syntax_validator"
     RESOLUTIONCRITIC = "resolution_critic"
+    GEORELATING_ACTOR = "georelating_actor"
+    GEORELATINGVALIDATOR = "georelating_validator"
+    GEORELATINGCRITIC = "georelating_critic"
 
 class Error(BaseModel):
     execution_step: ExecutionStep | str = Field(description="The step in which the error occurred")

@@ -5,9 +5,11 @@ import itertools
 from typing import Any
 
 import pycountry
+from geopy.distance import geodesic
 from langchain_core.messages import AIMessage
 
-from models.candidates import ReflectionPhase, ResolvedToponym, GeoCodingState, ResolvedToponymWithErrors
+from models.candidates import ReflectionPhase, ResolvedToponym, GeoCodingState, GeoRelatingState, \
+    ResolvedToponymWithErrors
 from models.errors import Error, ExecutionStep
 from models.llm_output import ToponymSearchArguments, ToponymSearchArgumentsWithErrors, ValidatedOutput, LLMOutput
 
@@ -77,9 +79,45 @@ class OutputParser:
             content = content[content.find(start_token):]
         if content[-1] != end_token:
             content = content[:content.rfind(end_token) + 1]
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError as e:
+            if "Extra data" not in str(e):
+                raise
+            # Model emitted multiple JSON objects — collect and merge them into one.
+            decoder = json.JSONDecoder()
+            remaining = content.strip()
+            if start_token == '{':
+                merged: dict = {}
+                while remaining:
+                    try:
+                        obj, idx = decoder.raw_decode(remaining)
+                        if isinstance(obj, dict):
+                            merged.update(obj)
+                        remaining = remaining[idx:].strip()
+                    except json.JSONDecodeError:
+                        break
+                if not merged:
+                    raise
+                result = merged
+            elif start_token == '[':
+                combined: list = []
+                while remaining:
+                    try:
+                        obj, idx = decoder.raw_decode(remaining)
+                        if isinstance(obj, list):
+                            combined.extend(obj)
+                        remaining = remaining[idx:].strip()
+                    except json.JSONDecodeError:
+                        break
+                if not combined:
+                    raise
+                result = combined
+            else:
+                raise
         if return_thoughts:
-            return json.loads(content), chain_of_thought
-        return json.loads(content)
+            return result, chain_of_thought
+        return result
 
     @staticmethod
     def handle_parsing_error(e: Exception, step: ExecutionStep):
@@ -500,6 +538,14 @@ class ResolutionSyntaxValidator:
                 for valid_toponym in state.valid_geocoded_toponyms:
                     temp_gt_toponyms.remove(valid_toponym.toponym)
 
+            # geonameIds of the retrieved candidates per toponym, to verify that the
+            # selected candidate actually references one of them
+            candidate_ids_per_toponym = {
+                toponym.toponym_with_search_arguments.toponym.casefold():
+                    [candidate["geonameId"] for candidate in toponym.candidates if "geonameId" in candidate]
+                for toponym in state.toponyms_with_candidates
+            }
+
             # Copy resolved toponyms
             resolved_toponyms = state.geocoded_toponyms.copy()
 
@@ -513,6 +559,14 @@ class ResolutionSyntaxValidator:
                 if resolved_toponym.selected_candidate_geonameId and not _is_integer(
                         resolved_toponym.selected_candidate_geonameId):
                     errors.append("Selected candidate geonameId must be an integer.")
+                elif resolved_toponym.selected_candidate_geonameId and isinstance(resolved_toponym.toponym, str):
+                    candidate_ids = candidate_ids_per_toponym.get(resolved_toponym.toponym.casefold())
+                    if candidate_ids is not None and resolved_toponym.selected_candidate_geonameId not in candidate_ids:
+                        errors.append(
+                            f"Selected candidate geonameId {resolved_toponym.selected_candidate_geonameId} does not "
+                            f"reference any of the retrieved candidates for this toponym. Copy the geonameId "
+                            f"exactly from one of the candidates: {candidate_ids}. If none of them matches the "
+                            f"toponym, select null.")
                 return errors
 
             # Validate resolved toponyms
@@ -559,4 +613,155 @@ class ResolutionSyntaxValidator:
         except Exception as e:
             state.resolution_fatal_errors.append(Error(execution_step=ExecutionStep.RESOLUTIONSYNTAXVALIDATOR,
                                                        error_message=str(e)))
+            return state
+
+
+def extract_geocoded_toponyms(candidate_resolution: GeoCodingState) -> list[dict]:
+    """
+    Extracts geocoded toponyms from the candidate resolution state.
+    Args:
+        candidate_resolution (GeoCodingState): The candidate resolution state containing geocoded toponyms.
+    Returns:
+        List[dict]: A list of dictionaries representing the geocoded toponyms, each containing the toponym and its coordinates.
+    """
+    geocoded_toponyms = []
+    for topo in candidate_resolution.valid_geocoded_toponyms:
+        for item in candidate_resolution.toponyms_with_candidates:
+            if item.toponym_with_search_arguments.toponym.casefold() == topo.toponym.casefold():
+                # get the candidate with the correct geonameid
+                for candidate in item.candidates:
+                    if topo.selected_candidate_geonameId == candidate["geonameId"]:
+                        topo.coordinates = {"latitude": candidate["lat"],
+                                            "longitude": candidate["lng"]}
+                        geocoded_toponyms.append(topo)
+                        break
+                break
+    geocoded_toponyms = [toponym.model_dump() for toponym in geocoded_toponyms]
+    return geocoded_toponyms
+
+
+def _find_latlng(obj):
+    """Recursively search ``obj`` for the first dict that has both
+    'latitude' and 'longitude' keys (case-insensitive)."""
+    if isinstance(obj, dict):
+        keys_lower = {k.lower(): k for k in obj.keys() if isinstance(k, str)}
+        if "latitude" in keys_lower and "longitude" in keys_lower:
+            return {"latitude": obj[keys_lower["latitude"]],
+                    "longitude": obj[keys_lower["longitude"]]}
+        for v in obj.values():
+            found = _find_latlng(v)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _find_latlng(v)
+            if found is not None:
+                return found
+    return None
+
+
+def _find_area(obj):
+    """Recursively search ``obj`` for the first numeric value whose key
+    references an affected area (case-insensitive substring 'area')."""
+    if isinstance(obj, dict):
+        # Prefer keys that explicitly mention area
+        for k, v in obj.items():
+            if isinstance(k, str) and "area" in k.lower() and isinstance(v, (int, float)):
+                return v
+        for v in obj.values():
+            found = _find_area(v)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _find_area(v)
+            if found is not None:
+                return found
+    return None
+
+
+class GeorelatingValidator:
+    """Validates and normalizes the parsed georelating output (geospatial reasoning stage)."""
+
+    CENTER_KEY = "center coordinates of affected area"
+    AREA_KEY = "affected area in square km"
+
+    def __init__(self, max_center_landmark_distance_km: float = 500.0):
+        self.max_center_landmark_distance_km = max_center_landmark_distance_km
+
+    def _normalize(self, output: dict) -> tuple[dict | None, float | None]:
+        center = output.get(self.CENTER_KEY)
+        area = output.get(self.AREA_KEY)
+        if center is None:
+            center = output.get("center_coordinates_of_affected_area")
+        if area is None:
+            area = output.get("affected_area_in_square_km")
+        # Tolerate deviating key structures across model runs
+        if not isinstance(center, dict) or "latitude" not in center or "longitude" not in center:
+            center = _find_latlng(output)
+        if not isinstance(area, (int, float)):
+            area = _find_area(output)
+        return center, area
+
+    def validate_georelating(self, state: GeoRelatingState) -> GeoRelatingState:
+        """
+        Validate the georelating output: required keys, coordinate ranges, positive area,
+        and coherence of the center with the resolved landmark coordinates.
+        On success, state.georelated is normalized to the canonical two-key format.
+        """
+        try:
+            state.georelating_invalid_output_errors = []
+            errors = []
+
+            center, area = self._normalize(state.georelated)
+
+            lat, lng = None, None
+            if center is None:
+                errors.append(f"Missing or malformed key '{self.CENTER_KEY}' with 'latitude' and 'longitude'.")
+            else:
+                try:
+                    lat, lng = float(center["latitude"]), float(center["longitude"])
+                except (TypeError, ValueError, KeyError):
+                    errors.append("Latitude and longitude must be numeric values in decimal degrees.")
+                if lat is not None and not -90 <= lat <= 90:
+                    errors.append(f"Latitude {lat} is outside the valid range [-90, 90].")
+                if lng is not None and not -180 <= lng <= 180:
+                    errors.append(f"Longitude {lng} is outside the valid range [-180, 180].")
+
+            if area is None:
+                errors.append(f"Missing or non-numeric key '{self.AREA_KEY}'.")
+            elif float(area) <= 0:
+                errors.append(f"Affected area must be positive, got {area}.")
+
+            # Coherence: the predicted center must lie near at least one resolved landmark
+            if not errors and lat is not None:
+                landmark_coords = []
+                for topo in extract_geocoded_toponyms(state):
+                    try:
+                        landmark_coords.append((float(topo["coordinates"]["latitude"]),
+                                                float(topo["coordinates"]["longitude"])))
+                    except (TypeError, ValueError, KeyError):
+                        continue
+                if landmark_coords:
+                    min_dist = min(geodesic((lat, lng), lm).kilometers for lm in landmark_coords)
+                    if min_dist > self.max_center_landmark_distance_km:
+                        errors.append(
+                            f"Predicted center is {min_dist:.0f} km away from the nearest resolved landmark, "
+                            f"exceeding the plausibility limit of {self.max_center_landmark_distance_km:.0f} km. "
+                            f"The affected area must be located relative to the toponyms mentioned in the report.")
+
+            if errors:
+                state.georelating_invalid_output_errors = [Error(
+                    execution_step=ExecutionStep.GEORELATINGVALIDATOR,
+                    error_message=" ".join(errors)
+                )]
+            else:
+                state.georelated = {
+                    self.CENTER_KEY: {"latitude": lat, "longitude": lng},
+                    self.AREA_KEY: float(area)
+                }
+            return state
+        except Exception as e:
+            state.georelating_fatal_errors.append(Error(execution_step=ExecutionStep.GEORELATINGVALIDATOR,
+                                                        error_message=str(e)))
             return state

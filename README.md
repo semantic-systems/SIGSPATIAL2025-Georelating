@@ -12,6 +12,7 @@ Moltzen, K., Usbeck, R., & Huang, J. (2025). GANDR: Georelating-Annotated Natura
 ### Preliminaries
 - Please ensure you have an envoronment file containing your API key for the LLM invocation `SAIA_API_KEY` and GeoNames API username `GEONAMES_USERNAME`.
 - In case you want to run the code to geocode the LGL corpus or GeoCoDe dataset, please download and save it to `data/`.
+- Note that the model roster of the ChatAI API changes over time: the models used for the published experiments (`llama-3.3-70b-instruct`, `mistral-large-instruct`) are no longer served. Choose currently available substitutes (see `GET /v1/models`, cached in `modules/available_models.json`) and set them as `actor`/`critic` in `modules/georelating.py`.
 ### Requirements
 This code was written in Python 3.12. To run the code, please install the requirements from `requirements.txt`:
 ```bash

@@ -453,3 +453,80 @@ class LongTermMemory:
                   example + string_seperator +
                   input)
         return prompt
+
+    ####################################################################################################################
+    # Reflective (Critic) GeoRelating
+    ####################################################################################################################
+
+    @staticmethod
+    def _generate_initial_generation_prompt_for_georelating(state) -> str:
+        generated_output = str(state.georelating_raw_output.content)
+        initial_generation_prompt = (
+            f"Original Prompt Text: \n {state.georelating_prompt + string_seperator}"
+            f"Generated Output: \n {generated_output}"
+        )
+        return initial_generation_prompt
+
+    def generate_georelating_critic_prompt_for_fatal_errors(self, state) -> str:
+        """
+        Generate the prompt for the georelating critic in case of fatal errors.
+        :param state: The current state of the reflective georelating (GeoRelatingState).
+        :return: The formatted prompt for the georelating critic.
+        """
+        initial_generation_prompt = self._generate_initial_generation_prompt_for_georelating(state)
+        return self.generate_critic_prompt_for_fatal_errors(state=state,
+                                                            fatal_errors=state.georelating_fatal_errors,
+                                                            initial_prompt=initial_generation_prompt)
+
+    def generate_georelating_critic_prompt_for_invalid_output(self, state) -> str:
+        """
+        Generate the prompt for the georelating critic in case of an invalid, but not fatal output.
+        :param state: The current state of the reflective georelating (GeoRelatingState).
+        :return: The formatted prompt for the georelating critic.
+        """
+        critic_system_prompt = (
+            "System: \n"
+            "You are a constructive critic for the actor LLM which generated the output below. Please analyze the "
+            "generated output and its corresponding validation errors. Provide actionable feedback to fix these "
+            "errors. Make sure your feedback adheres closely to the instructions in the original prompt. Your "
+            "feedback will be directly used to guide the actor LLM to generate a better output in the future. "
+            "Focus ONLY on the validation errors listed below. Be as concise as possible."
+        )
+        initial_generation_prompt = self._generate_initial_generation_prompt_for_georelating(state)
+
+        validation_errors = str([error.model_dump() for error in state.georelating_invalid_output_errors])
+        validation_errors_text = f"Validation errors of the output: \n {validation_errors}"
+
+        critic_instruction = "Your feedback:\n"
+
+        critic_prompt_text = (critic_system_prompt + string_seperator +
+                              initial_generation_prompt + string_seperator +
+                              validation_errors_text + string_seperator +
+                              critic_instruction)
+
+        prompt = PromptTemplate(
+            template=critic_prompt_text,
+            template_format="mustache",
+            input_variables=[]
+        )
+        return prompt.format()
+
+    def generate_georelating_reflected_actor_prompt(self, state) -> str:
+        """
+        Generate the prompt for the reflective actor in the georelating stage.
+        :param state: The current state of the reflective georelating (GeoRelatingState).
+        :return: The formatted prompt for the reflective actor.
+        """
+        initial_generation_prompt_text = self._generate_initial_generation_prompt_for_georelating(state)
+        feedback = f"Actionable feedback by the critic: \n{str(state.georelating_critic_feedback.content)}"
+
+        reflected_prompt_text = (self.reflective_actor_system_prompt + string_seperator +
+                                 initial_generation_prompt_text + string_seperator +
+                                 feedback + string_seperator +
+                                 self.reflective_actor_instruction_prompt_text)
+        prompt = PromptTemplate(
+            template=reflected_prompt_text,
+            template_format="mustache",
+            input_variables=[]
+        )
+        return prompt.format()

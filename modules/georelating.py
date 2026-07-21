@@ -1,65 +1,42 @@
 import os
 import time
 import logging
-import threading
 import json
 
-import h3
 import stanza
 import pandas as pd
 
 from threading import Lock
-from typing import List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from agent_components.llms.chatAI import ChatAIHandler
-from agent_components.environment.internal_tools import OutputParser
-from helpers.helpers import preprocess_data
-from models.candidates import CandidateGenerationState, GeoCodingState
+from tqdm import tqdm
+
+from agent_components.environment.external_tools import safe_latlng_to_cell, safe_smallest_covering_cell
+from agent_components.llms.api_error_handler import MultiWindowRateLimiter
+from models.candidates import GeoRelatingState
 from models.errors import ExecutionStep
 from modules.reflective_geocoding import ReflectiveGeoCoder
 
 """
-Threading and Rate Limiting
+Configuration
 """
 
-class MultiWindowRateLimiter:
-    def __init__(self, limits):
-        """
-        limits: list of tuples (max_calls, period_sec), e.g.
-            [(2, 1), (60, 60), (3000, 3600)]
-        """
-        self.limits = limits
-        self.lock = threading.Lock()
-        self.timestamps = []  # all call times for sliding window checks
-
-    def acquire(self):
-        while True:
-            with self.lock:
-                now = time.time()
-                # Remove timestamps older than the max period
-                max_period = max(period for _, period in self.limits)
-                self.timestamps = [t for t in self.timestamps if now - t < max_period]
-
-                waits = []
-                for max_calls, period in self.limits:
-                    window = [t for t in self.timestamps if now - t < period]
-                    if len(window) >= max_calls:
-                        # How many seconds until next slot becomes available?
-                        wait = period - (now - window[0])
-                        waits.append(wait)
-                    else:
-                        waits.append(0)
-                max_wait = max(waits)
-                if max_wait > 0:
-                    # Must release lock before sleep to not block other threads
-                    pass
-                else:
-                    # Allowed, record this call and return
-                    self.timestamps.append(now)
-                    return  # Ready to proceed
-            # Sleep outside lock to prevent deadlocks
-            time.sleep(max_wait)
+MAX_WORKERS = 4
+# GWDG ChatAI rate limits, enforced per LLM call (see api_error_handler constants)
+LLM_RATE_LIMITS = [
+    (2, 1),        # 2 per second
+    (50, 60),      # 60 per minute
+    (2700, 3600),  # 3000 per hour
+]
+# The unified three-stage graph exceeds langgraph's default recursion limit of 25
+# when reflection loops fire in several stages.
+GRAPH_RECURSION_LIMIT = 50
+# If True, the full graph state (incl. all prompts and raw LLM outputs) is written
+# to the JSONL file per row; otherwise only a compact result record is saved.
+SAVE_FULL_STATE = False
+# v2: cache entries depend on the toponym extraction heuristic; bump the file name
+# whenever extract_toponyms_from_doc changes so stale entries are not reused.
+TOPONYM_CACHE_FILE = "toponym_cache_v2.json"
 
 
 """
@@ -79,6 +56,9 @@ def configure_logging(logfilename):
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s')
+    # every chat completion emits an INFO line otherwise
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 """
 Helpers
@@ -119,37 +99,15 @@ def extract_title_text_from_row(row):
     return pd.Series({'title': title, 'text': text})
 
 
-def extract_geocoded_toponyms(candidate_resolution: GeoCodingState):
-    """
-    Extracts geocoded toponyms from the candidate resolution state.
-    Args:
-        candidate_resolution (GeoCodingState): The candidate resolution state containing geocoded toponyms.
-    Returns:
-        List[dict]: A list of dictionaries representing the geocoded toponyms, each containing the toponym and its coordinates.
-    """
-    geocoded_toponyms = []
-    for topo in candidate_resolution.valid_geocoded_toponyms:
-        for item in candidate_resolution.toponyms_with_candidates:
-            if item.toponym_with_search_arguments.toponym.casefold() == topo.toponym.casefold():
-                # get the candidate with the correct geonameid
-                for candidate in item.candidates:
-                    if topo.selected_candidate_geonameId == candidate["geonameId"]:
-                        topo.coordinates = {"latitude": candidate["lat"],
-                                            "longitude": candidate["lng"]}
-                        geocoded_toponyms.append(topo)
-                        break
-                break
-    geocoded_toponyms = [toponym.model_dump() for toponym in geocoded_toponyms]
-    return geocoded_toponyms
-
-
 """
 Toponym Recognition
 """
 
 
-def recognize_toponyms(article_text):
-    doc = nlp(article_text)
+def extract_toponyms_from_doc(doc):
+    """Extract toponyms from a processed stanza Document, merging comma-separated
+    compound toponyms (e.g. 'Yaiza, Lanzarote')."""
+    article_text = doc.text
     entities = doc.entities
     toponyms = []
 
@@ -171,12 +129,24 @@ def recognize_toponyms(article_text):
 
             # Case 1: Merge if comma-separated and no "and" (likely compound toponym)
             if between_text == "," and next_entity.type in ["GPE"]:
-                merged_toponym = f"{current_text}, {next_entity.text.strip()}"
-                # Check if the merged toponym is already in the list
-                if merged_toponym not in toponyms:
-                    toponyms.append(merged_toponym)
-                i += 2
-                continue
+                # Do not merge enumerations like "Sudley, Yorkshire, Matthews and
+                # Battery Heights": if yet another location entity follows the pair,
+                # joined by a comma or "and", the comma is a list separator rather
+                # than part of a compound toponym like "NEWARK, Ohio".
+                is_enumeration = False
+                if i + 2 < len(entities):
+                    after_next = entities[i + 2]
+                    connector = article_text[next_entity.end_char:after_next.start_char].strip().lower()
+                    if after_next.type in ["LOC", "GPE"] and connector in {",", ", and", "and"}:
+                        is_enumeration = True
+
+                if not is_enumeration:
+                    merged_toponym = f"{current_text}, {next_entity.text.strip()}"
+                    # Check if the merged toponym is already in the list
+                    if merged_toponym not in toponyms:
+                        toponyms.append(merged_toponym)
+                    i += 2
+                    continue
 
         if current_text not in toponyms:
             toponyms.append(current_text)
@@ -186,90 +156,92 @@ def recognize_toponyms(article_text):
     return toponyms
 
 
+def recognize_toponyms_bulk(texts, nlp):
+    """Run stanza NER over a list of article texts in one batched call."""
+    if hasattr(nlp, "bulk_process"):
+        docs = nlp.bulk_process(list(texts))
+    else:
+        docs = [nlp(text) for text in texts]
+    return [extract_toponyms_from_doc(doc) for doc in docs]
+
+
+def compute_toponyms_with_cache(df, cache_path):
+    """
+    Return the toponym list per row of ``df`` (keyed by landmark_id), running the
+    stanza NER pipeline only for articles that are not in the cache yet. The stanza
+    pipeline is only initialized when at least one article is missing from the cache.
+    """
+    cache = {}
+    if os.path.exists(cache_path):
+        with open(cache_path, "r", encoding="utf-8") as f:
+            cache = json.load(f)
+
+    ids = df['landmark_id'].astype(str)
+    missing_mask = ~ids.isin(cache.keys())
+    if missing_mask.any():
+        logging.info(f"Running NER for {int(missing_mask.sum())} articles "
+                     f"({int((~missing_mask).sum())} cached).")
+        nlp = stanza.Pipeline(lang='en', processors='tokenize,ner',
+                              download_method=stanza.DownloadMethod.REUSE_RESOURCES)
+        texts = df.loc[missing_mask, 'disaster_news_article_text'].tolist()
+        toponym_lists = recognize_toponyms_bulk(texts, nlp)
+        for landmark_id, toponyms in zip(ids[missing_mask], toponym_lists):
+            cache[landmark_id] = toponyms
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False)
+    else:
+        logging.info(f"All {len(df)} articles found in the toponym cache, skipping NER.")
+
+    return ids.map(cache)
+
+
 """
 GeoRelating
 """
 
 
-def georelate(model_name: str, long_term_memory, article_text: str, mentioned_toponyms: List[dict]):
-    """
-    Georelate the given article text with the mentioned toponyms using a language model.
-    Args:
-        model_name (str): The name of the language model to use.
-        long_term_memory: The long term memory object containing the model.
-        article_text (str): The text of the article to georelate.
-        mentioned_toponyms (List[str]): A list of toponyms mentioned in the article.
-    Returns:
-        dict: The georelation result containing the geocoded toponyms and their coordinates.
-    """
-    prompt = long_term_memory.generate_geoelation_prompt(article_text=article_text,
-                                                          mentioned_toponyms=mentioned_toponyms,
-                                                          example_path=r"data/few_shot_example_georelating.json")
-    handler = ChatAIHandler()
-    model = handler.get_model(model_name)
-    llm_answer = model.invoke(prompt)
-    cleaned_output = OutputParser.clean_and_parse_json_content(content=llm_answer.content,
-                                                               start_token='{',
-                                                               end_token='}')
-    return cleaned_output
+def build_result_row(idx, row, state: GeoRelatingState) -> dict:
+    """Compact per-row result record for the JSONL file."""
+    if SAVE_FULL_STATE:
+        return {
+            "index": idx,
+            "landmark_id": row['landmark_id'],
+            "state": state.model_dump(),
+            "georelated": state.georelated if state.georelated else None
+        }
 
-# H3 cell areas by resolution (in m^2)
-h3_areas = {res: h3.average_hexagon_area(res, unit="m^2") for res in range(16)}  # resolutions 0–15
-
-# Function to get lowest H3 resolution that fits the area
-def get_h3_resolution_for_area(area_m2):
-    for res in sorted(h3_areas, reverse=True):
-        if h3_areas[res] >= area_m2:
-            return res
-    return 5  # fallback to 5
-
-def safe_latlng_to_cell(x):
-    geor = x.get("georelated")
-    if not geor:
-        return None
-    if isinstance(geor, dict):
-        center = geor.get("center coordinates of affected area")
-        area = geor.get("affected area in square km")
-        if center is None:
-            center = geor.get("center_coordinates_of_affected_area")
-        if area is None:
-            area = geor.get("affected_area_in_square_km")
-    else:
-        center = None
-        area = None
-    if not center:
-        return None
-    lat = center.get("latitude") if isinstance(center, dict) else None
-    lng = center.get("longitude") if isinstance(center, dict) else None
-    if lat is None or lng is None or area is None:
-        return None
-    try:
-        return h3.latlng_to_cell(
-            lat=float(lat),
-            lng=float(lng),
-            res=get_h3_resolution_for_area(float(area) * 1e6),
-        )
-    except Exception as e:
-        return None
-
-# Instantiate
-rate_limiter = MultiWindowRateLimiter([
-    (1, 1),        # 2 per second
-    (50, 60),      # 60 per minute
-    (2700, 3600),  # 3000 per hour
-])
-
-def safe_llm_call(fn, *args, **kwargs):
-    thread_id = threading.get_ident()
-    logging.info(f"Thread-{thread_id} waiting for rate limiter...")
-    rate_limiter.acquire()
-    logging.info(f"Thread-{thread_id} passed rate limit and calling {fn.__name__}...")
-    result = fn(*args, **kwargs)
-    logging.info(f"Thread-{thread_id} finished {fn.__name__}")
-    return result
+    errors = [error.model_dump() for error in (state.fatal_errors +
+                                               state.resolution_fatal_errors +
+                                               state.georelating_fatal_errors +
+                                               state.georelating_invalid_output_errors)]
+    return {
+        "index": idx,
+        "landmark_id": row['landmark_id'],
+        "toponyms": state.toponyms,
+        "geocoded_toponyms": [
+            {
+                "toponym": topo.toponym,
+                "selected_candidate_geonameId": topo.selected_candidate_geonameId,
+                "coordinates": topo.coordinates
+            }
+            for topo in state.valid_geocoded_toponyms
+        ],
+        "invalid_toponyms": [
+            {"toponym": topo.toponym,
+             "error": topo.errors_per_toponym[-1].error_message if topo.errors_per_toponym else None}
+            for topo in state.invalid_toponyms
+        ] or None,
+        "unresolved_toponyms": [
+            {"toponym": topo.toponym,
+             "error": topo.errors[-1].error_message if topo.errors else None}
+            for topo in state.invalid_geocoded_toponyms
+        ] or None,
+        "georelated": state.georelated if state.georelated else None,
+        "errors": errors if errors else None
+    }
 
 
-def process_row_save_as_jsonl(row, geocoder, generation_agent_graph, resolution_agent_graph, output_path, processed_indices_set, lock):
+def process_row_save_as_jsonl(row, agent_graph, output_path, processed_indices_set, lock):
     idx = row.name
     if idx in processed_indices_set:
         logging.info(f"Article {idx} already processed, skipping.")
@@ -289,34 +261,11 @@ def process_row_save_as_jsonl(row, geocoder, generation_agent_graph, resolution_
                 "toponyms": row['toponyms']
             }
 
-            generation_agent_graph_answer = safe_llm_call(generation_agent_graph.invoke, input_state)
-            candidate_generation = CandidateGenerationState(**generation_agent_graph_answer)
+            agent_graph_answer = agent_graph.invoke(
+                input_state, config={"recursion_limit": GRAPH_RECURSION_LIMIT})
+            state = GeoRelatingState(**agent_graph_answer)
 
-            candidate_generation_dict = preprocess_data(candidate_generation.model_dump(), GeoCodingState)
-            resolution_agent_graph_answer = safe_llm_call(resolution_agent_graph.invoke, candidate_generation_dict)
-            candidate_resolution = GeoCodingState(**resolution_agent_graph_answer)
-            geocoded_toponyms = extract_geocoded_toponyms(candidate_resolution)
-
-            # Get project root directory
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.dirname(script_dir)
-            example_path = os.path.join(project_root, "data/few_shot_examples/few_shot_example_georelating.json")
-
-            prompt = geocoder.working_memory.long_term_memory.generate_georelating_prompt(
-                article_text=row['disaster_news_article_text'],
-                mentioned_toponyms=geocoded_toponyms,
-                example_path=example_path
-            )
-            llm_answer = safe_llm_call(geocoder.llm.invoke, prompt)
-            cleaned_output = OutputParser.clean_and_parse_json_content(llm_answer.content, '{', '}')
-
-            result = {
-                "index": idx,
-                "landmark_id": row['landmark_id'],
-                "generated_candidates": candidate_generation.model_dump() if candidate_generation else None,
-                "geocoded_toponyms": candidate_resolution.model_dump() if candidate_resolution else None,
-                "georelated": cleaned_output
-            }
+            result = build_result_row(idx, row, state)
 
             # Save immediately, thread-safe
             with lock:
@@ -338,8 +287,6 @@ def process_row_save_as_jsonl(row, geocoder, generation_agent_graph, resolution_
     result = {
         "index": idx,
         "landmark_id": row['landmark_id'],
-        "generated_candidates": None,
-        "geocoded_toponyms": None,
         "georelated": None,
         "error": str(last_exception)
     }
@@ -373,29 +320,23 @@ def parallel_process_dataframe_jsonl(df, geocoder, output_path):
     processed_indices = load_already_processed_indices(output_path)
     logging.info(f"Already processed {len(processed_indices)} rows, will skip them.")
 
-    generation_graph_builder = geocoder.build_graph()
-    generation_agent_graph = generation_graph_builder.compile()
-    resolution_graph_builder = geocoder.build_resolution_graph()
-    resolution_agent_graph = resolution_graph_builder.compile()
+    agent_graph = geocoder.build_full_graph().compile()
 
     lock = Lock()  # for file write safety
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = []
-        for idx, row in df.iterrows():
-            # Each thread gets the lock, processed_indices (could be updated, but OK for append-only)
-            futures.append(
-                executor.submit(
-                    process_row_save_as_jsonl,
-                    row, geocoder,
-                    generation_agent_graph,
-                    resolution_agent_graph,
-                    output_path,
-                    processed_indices,
-                    lock
-                )
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = [
+            executor.submit(
+                process_row_save_as_jsonl,
+                row,
+                agent_graph,
+                output_path,
+                processed_indices,
+                lock
             )
-        for future in as_completed(futures):
+            for idx, row in df.iterrows()
+        ]
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Georelating articles"):
             _ = future.result()  # We do not need results in-process, data is on disk
 
     logging.info("Processing finished.")
@@ -417,15 +358,13 @@ def load_processed_jsonl(jsonl_path):
 
 if __name__ == "__main__":
     data_file = "gandr.json"
-    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%X")
-
-    nlp = stanza.Pipeline(lang='en', processors='tokenize,ner')
+    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
 
     # llama-3.3-70b-instruct (actor) and mistral-large-instruct (critic) are no
     # longer served by the ChatAI API; mistral-medium-3.5-128b is the closest
     # currently available successor.
-    actor = "gemma-4-31b-it"
-    critic = "mistral-medium-3.5-128b"
+    actor = "mistral-medium-3.5-128b"
+    critic = "gemma-4-31b-it"
     dataset = "New"
 
     # Get the project root directory (parent of modules/)
@@ -445,21 +384,25 @@ if __name__ == "__main__":
     configure_logging(output_path.replace('.jsonl', "_log.log"))
     logging.info(f"Starting georelating for {data_file}")
 
+    rate_limiter = MultiWindowRateLimiter(LLM_RATE_LIMITS)
     geocoder = ReflectiveGeoCoder(
         actor_model_name=actor,
         critic_model_name=critic,
         call_times=[],
         skip_few_shot_loader=False,
-        data_set=dataset
+        data_set=dataset,
+        rate_limiter=rate_limiter
     )
 
     df = pd.read_json(data_path, orient='records')
 
     df[['disaster_news_article_title', 'disaster_news_article_text']] = df.apply(extract_title_text_from_row, axis=1)
-    df['toponyms'] = df['disaster_news_article_text'].apply(recognize_toponyms)
 
     # process only 3 rows for testing
-    df = df.tail(3)
+    df = df.head(10)
+
+    # NER only for the selected rows; cached results are reused across runs
+    df['toponyms'] = compute_toponyms_with_cache(df, os.path.join(output_dir, TOPONYM_CACHE_FILE))
 
     parallel_process_dataframe_jsonl(df, geocoder, output_path)
 
@@ -472,6 +415,7 @@ if __name__ == "__main__":
         how='left'
     )
     merged_df['pred_cell'] = merged_df.apply(safe_latlng_to_cell, axis=1)
+    merged_df['pred_cell_covering'] = merged_df.apply(safe_smallest_covering_cell, axis=1)
 
     output_merged_path = output_path.replace('.jsonl', '.json')
     merged_df.to_json(output_merged_path, orient="records", force_ascii=False, indent=4)

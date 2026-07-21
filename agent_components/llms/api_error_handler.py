@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime
 
 import requests
@@ -9,6 +10,44 @@ DAILY_RATE_LIMIT = 75000
 HOURLY_RATE_LIMIT = 3000
 MINUTE_RATE_LIMIT = 60
 SECOND_RATE_LIMIT = 2
+
+
+class MultiWindowRateLimiter:
+    """Thread-safe sliding-window rate limiter, proactively enforced per LLM call."""
+
+    def __init__(self, limits):
+        """
+        limits: list of tuples (max_calls, period_sec), e.g.
+            [(2, 1), (60, 60), (3000, 3600)]
+        """
+        self.limits = limits
+        self.lock = threading.Lock()
+        self.timestamps = []  # all call times for sliding window checks
+
+    def acquire(self):
+        while True:
+            with self.lock:
+                now = time.time()
+                # Remove timestamps older than the max period
+                max_period = max(period for _, period in self.limits)
+                self.timestamps = [t for t in self.timestamps if now - t < max_period]
+
+                waits = []
+                for max_calls, period in self.limits:
+                    window = [t for t in self.timestamps if now - t < period]
+                    if len(window) >= max_calls:
+                        # How many seconds until next slot becomes available?
+                        wait = period - (now - window[0])
+                        waits.append(wait)
+                    else:
+                        waits.append(0)
+                max_wait = max(waits)
+                if max_wait <= 0:
+                    # Allowed, record this call and return
+                    self.timestamps.append(now)
+                    return
+            # Sleep outside lock to prevent deadlocks
+            time.sleep(max_wait)
 
 
 def handle_api_errors(call_times):
