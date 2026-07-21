@@ -1,10 +1,24 @@
 import os
 import subprocess
 
-from langchain_core.prompts import PipelinePromptTemplate, PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 from agent_components.memory.episodic_memory import EpisodicMemory
 from agent_components.memory.long_term_memory import LongTermMemory
+
+
+class _PipelinePromptAdapter:
+    """Replacement for the removed langchain_core PipelinePromptTemplate.
+
+    Pre-formats static sub-prompts at construction time and delegates
+    dynamic formatting to the few-shot template.
+    """
+    def __init__(self, static_prefix: str, few_shot_template):
+        self._prefix = static_prefix
+        self._few_shot = few_shot_template
+
+    def format(self, **kwargs) -> str:
+        return self._prefix + "\n" + self._few_shot.format(**kwargs)
 
 
 class WorkingMemory:
@@ -15,19 +29,10 @@ class WorkingMemory:
                                                skip_few_shot_loader=skip_few_shot_loader)
         self.long_term_memory = LongTermMemory()
 
-    def create_final_prompt(self) -> PipelinePromptTemplate:
-        final_template = "{system_instructions}\n{task_instructions}\n{documentation}\n{few_shot_examples}"
-        final_prompt = PromptTemplate.from_template(final_template)
-        pipeline_prompts = [
-            ("system_instructions", self.long_term_memory.system_instructions_prompt),
-            ("task_instructions", self.long_term_memory.task_instructions_prompt),
-            ("documentation", self.long_term_memory.documentation_prompt),
-            ("few_shot_examples", self.few_shot_handler.few_shot_template)
-        ]
-        return PipelinePromptTemplate(
-            final_prompt=final_prompt,
-            pipeline_prompts=pipeline_prompts,
-            input_variables=self.few_shot_handler.few_shot_template.input_variables.extend(
-                self.long_term_memory.task_instructions_prompt.input_variables
-            )
-        )
+    def create_final_prompt(self) -> _PipelinePromptAdapter:
+        static_prefix = "\n".join([
+            self.long_term_memory.system_instructions_prompt.format(),
+            self.long_term_memory.task_instructions_prompt.format(),
+            self.long_term_memory.documentation_prompt.format(),
+        ])
+        return _PipelinePromptAdapter(static_prefix, self.few_shot_handler.few_shot_template)

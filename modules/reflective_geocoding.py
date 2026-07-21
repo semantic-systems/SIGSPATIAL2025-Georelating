@@ -113,7 +113,7 @@ class ReflectiveGeoCoder:
                 )]
             )
 
-    def extract_generation_output(self, state: LLMOutput) -> LLMOutput:
+    def extract_generation_output(self, state: CandidateGenerationState) -> LLMOutput:
         parser = OutputParser(article_id=state.article_id,
                               toponym_list=state.toponyms)
         parsed_output = parser.extract_generation_output(state.raw_output)
@@ -125,10 +125,10 @@ class ReflectiveGeoCoder:
         })
         return LLMOutput(**parsed_data)
 
-    def validate_output(self, state: LLMOutput) -> ValidatedOutput:
+    def validate_output(self, state: CandidateGenerationState) -> ValidatedOutput:
         return self.validator.validate_toponyms_of_article(state)
 
-    def retrieve_candidates(self, state: ValidatedOutput) -> CandidateGenerationOutput:
+    def retrieve_candidates(self, state: CandidateGenerationState) -> CandidateGenerationOutput:
         return self.geonames.retrieve_candidates(state)
 
     def criticize(self, state: CandidateGenerationState) -> CandidateGenerationState:

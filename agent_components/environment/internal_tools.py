@@ -77,9 +77,45 @@ class OutputParser:
             content = content[content.find(start_token):]
         if content[-1] != end_token:
             content = content[:content.rfind(end_token) + 1]
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError as e:
+            if "Extra data" not in str(e):
+                raise
+            # Model emitted multiple JSON objects — collect and merge them into one.
+            decoder = json.JSONDecoder()
+            remaining = content.strip()
+            if start_token == '{':
+                merged: dict = {}
+                while remaining:
+                    try:
+                        obj, idx = decoder.raw_decode(remaining)
+                        if isinstance(obj, dict):
+                            merged.update(obj)
+                        remaining = remaining[idx:].strip()
+                    except json.JSONDecodeError:
+                        break
+                if not merged:
+                    raise
+                result = merged
+            elif start_token == '[':
+                combined: list = []
+                while remaining:
+                    try:
+                        obj, idx = decoder.raw_decode(remaining)
+                        if isinstance(obj, list):
+                            combined.extend(obj)
+                        remaining = remaining[idx:].strip()
+                    except json.JSONDecodeError:
+                        break
+                if not combined:
+                    raise
+                result = combined
+            else:
+                raise
         if return_thoughts:
-            return json.loads(content), chain_of_thought
-        return json.loads(content)
+            return result, chain_of_thought
+        return result
 
     @staticmethod
     def handle_parsing_error(e: Exception, step: ExecutionStep):

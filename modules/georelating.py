@@ -228,17 +228,66 @@ def get_h3_resolution_for_area(area_m2):
             return res
     return 5  # fallback to 5
 
+def _find_latlng(obj):
+    """Recursively search ``obj`` for the first dict that has both
+    'latitude' and 'longitude' keys (case-insensitive)."""
+    if isinstance(obj, dict):
+        keys_lower = {k.lower(): k for k in obj.keys() if isinstance(k, str)}
+        if "latitude" in keys_lower and "longitude" in keys_lower:
+            return {"latitude": obj[keys_lower["latitude"]],
+                    "longitude": obj[keys_lower["longitude"]]}
+        for v in obj.values():
+            found = _find_latlng(v)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _find_latlng(v)
+            if found is not None:
+                return found
+    return None
+
+
+def _find_area(obj):
+    """Recursively search ``obj`` for the first numeric value whose key
+    references an affected area (case-insensitive substring 'area')."""
+    if isinstance(obj, dict):
+        # Prefer keys that explicitly mention area
+        for k, v in obj.items():
+            if isinstance(k, str) and "area" in k.lower() and isinstance(v, (int, float)):
+                return v
+        for v in obj.values():
+            found = _find_area(v)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _find_area(v)
+            if found is not None:
+                return found
+    return None
+
+
 def safe_latlng_to_cell(x):
     geor = x.get("georelated")
     if not geor:
         return None
     if isinstance(geor, dict):
+        # Original flat format (with spaces or underscores)
         center = geor.get("center coordinates of affected area")
         area = geor.get("affected area in square km")
         if center is None:
             center = geor.get("center_coordinates_of_affected_area")
         if area is None:
             area = geor.get("affected_area_in_square_km")
+        # New tool-call format (varies in key names across model runs):
+        #   {"determine_coordinates": {"output": {<coord_key>: {latitude, longitude}}},
+        #    "estimate_area":         {"output": {<area_key>:  <float>}}}
+        # Walk the structure to find lat/lng and any numeric "area" value.
+        if center is None:
+            center = _find_latlng(geor)
+        if area is None:
+            area = _find_area(geor)
     else:
         center = None
         area = None
@@ -457,7 +506,7 @@ if __name__ == "__main__":
 
     df = pd.read_json(data_path, orient='records')
 
-    df = df.head(3)
+    df = df.head(10)
 
     df[['disaster_news_article_title', 'disaster_news_article_text']] = df.apply(extract_title_text_from_row, axis=1)
     df['toponyms'] = df['disaster_news_article_text'].apply(recognize_toponyms)
