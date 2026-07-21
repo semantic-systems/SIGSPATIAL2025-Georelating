@@ -17,7 +17,7 @@ string_seperator = "\n\n----------------------------------------\n"
 file_path = os.path.dirname(os.path.abspath(__file__))
 root_path = subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip().decode()
 GEONAMES_DOCUMENTATION = os.path.join(file_path, 'external_tool_documentation/geonames_websearch_documentation.md')
-FEWSHOT_RESOLUTION_EXAMPLES_PATH = os.path.join(root_path, "data/few_shot_examples_selection_short.json")
+FEWSHOT_RESOLUTION_EXAMPLES_PATH = os.path.join(root_path, "data/few_shot_examples/few_shot_examples_selection_short.json")
 class LongTermMemory:
     def __init__(self, documentation_file=GEONAMES_DOCUMENTATION):
         self.documentation_file = documentation_file
@@ -407,7 +407,9 @@ class LongTermMemory:
         )
         return prompt.format()
 
-    def _generate_georelating_example(self, example_path="data/few_shot_example_georelating.json"):
+    def _generate_georelating_example(self, example_path=None):
+        if example_path is None:
+            example_path = os.path.join(root_path, "data/few_shot_examples/few_shot_example_georelating.json")
         with open(example_path, "r") as f:
             example = json.load(f)
         template = (

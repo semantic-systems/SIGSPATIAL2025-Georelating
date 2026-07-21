@@ -33,7 +33,7 @@ class CandidateGenerationMetrics(BaseModel):
         description="Number of toponyms for which too many toponym candidates were generated",
         default=0)
 
-    median_nof_candidates: np.floating = Field(description="Median number of candidates per toponym if candidates were found",
+    median_nof_candidates: float = Field(description="Median number of candidates per toponym if candidates were found",
                                       default=0)
     nof_articles_with_fatal_errors: int = Field(
         description="Number of articles for which a fatal error occurred during the candidate generation",
