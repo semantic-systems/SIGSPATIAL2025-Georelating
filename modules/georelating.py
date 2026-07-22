@@ -34,6 +34,10 @@ GRAPH_RECURSION_LIMIT = 50
 # If True, the full graph state (incl. all prompts and raw LLM outputs) is written
 # to the JSONL file per row; otherwise only a compact result record is saved.
 SAVE_FULL_STATE = False
+# If True, actor LLM calls request the API's structured output mode
+# (response_format json_object), guaranteeing syntactically valid JSON. Off by
+# default so the effect can be evaluated cleanly against the baseline.
+USE_STRUCTURED_OUTPUT = False
 # v2: cache entries depend on the toponym extraction heuristic; bump the file name
 # whenever extract_toponyms_from_doc changes so stale entries are not reused.
 TOPONYM_CACHE_FILE = "toponym_cache_v2.json"
@@ -391,7 +395,8 @@ if __name__ == "__main__":
         call_times=[],
         skip_few_shot_loader=False,
         data_set=dataset,
-        rate_limiter=rate_limiter
+        rate_limiter=rate_limiter,
+        use_structured_output=USE_STRUCTURED_OUTPUT
     )
 
     df = pd.read_json(data_path, orient='records')

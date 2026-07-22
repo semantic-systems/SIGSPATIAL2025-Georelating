@@ -1,6 +1,7 @@
 import math
 import os
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 
 import h3
 import pyproj
@@ -16,12 +17,20 @@ class GeoNamesAPI:
     def __init__(self, article_id: str = None):
         self.base_url = "http://api.geonames.org/search?"
 
+    REQUEST_TIMEOUT_S = 20
+    # The per-toponym searches are independent I/O; a few run concurrently. Kept
+    # modest to stay within the GeoNames free webservice's per-second throttle.
+    MAX_SEARCH_CONCURRENCY = 5
+
     def search(self, params):
         params.update({'username': os.getenv('GEONAMES_USERNAME')})
         url = self.base_url + urllib.parse.urlencode(params)
-        response = requests.get(url)
-        if response.status_code != 200:
-            response = requests.get(url) #retry once
+        try:
+            response = requests.get(url, timeout=self.REQUEST_TIMEOUT_S)
+        except requests.exceptions.Timeout:
+            response = None
+        if response is None or response.status_code != 200:
+            response = requests.get(url, timeout=self.REQUEST_TIMEOUT_S)  # retry once
             if response.status_code != 200:
                 raise Exception(f"Error in GeoNamesAPI.search: {response.text}")
         json_response = response.json()
@@ -38,19 +47,48 @@ class GeoNamesAPI:
                 if validated_output.reflection_phase == ReflectionPhase.ACTOR_RETRY_ON_INVALID_TOPONYMS:
                     topos_to_search = [topo for topo in validated_output.valid_toponyms if topo.generated_by_retry]
                     correct_duplicates = [topo for topo in validated_output.duplicate_toponyms if topo.generated_by_retry]
-            for toponym_to_search_for in topos_to_search:
+            def _search_with_fallback(toponym_to_search_for):
+                """Search one toponym; on zero hits retry once with the plain toponym
+                as 'q'. Returns (toponym, response). Independent I/O per toponym, so
+                these run concurrently; only disjoint objects are touched."""
                 response = self.search(toponym_to_search_for.params)
                 if not response['geonames']:
-                    # No hits are almost always caused by overly specific or malformed
-                    # search arguments: flag the toponym as invalid so the critic can
+                    # Deterministic repair before involving the critic: no hits are
+                    # usually caused by overly specific search arguments, so retry
+                    # once with the plainest possible query for the toponym.
+                    fallback_params = {
+                        'q': toponym_to_search_for.toponym,
+                        'isNameRequired': True,
+                        'maxRows': (toponym_to_search_for.params or {}).get('maxRows', 10),
+                        'type': 'json'
+                    }
+                    response = self.search(fallback_params)
+                    if response['geonames']:
+                        # record the arguments that actually produced the candidates
+                        toponym_to_search_for.params = fallback_params
+                return toponym_to_search_for, response
+
+            if topos_to_search:
+                with ThreadPoolExecutor(
+                        max_workers=min(self.MAX_SEARCH_CONCURRENCY, len(topos_to_search))) as pool:
+                    # map preserves input order and re-raises the first worker
+                    # exception here, keeping the fatal-error-on-failure semantics
+                    search_results = list(pool.map(_search_with_fallback, topos_to_search))
+            else:
+                search_results = []
+
+            for toponym_to_search_for, response in search_results:
+                if not response['geonames']:
+                    # Still nothing: flag the toponym as invalid so the critic can
                     # refine the arguments instead of passing an unfindable toponym on.
                     candidate_generation_output.invalid_toponyms.append(ToponymSearchArgumentsWithErrors(
                         **toponym_to_search_for.model_dump(),
                         errors_per_toponym=[Error(
                             execution_step=ExecutionStep.GEOAPI,
-                            error_message="The GeoNames search returned zero results for these search arguments. "
-                                          "Provide less restrictive arguments, e.g. simplify the 'q' value to the "
-                                          "toponym itself or drop narrowing parameters."
+                            error_message="The GeoNames search returned zero results for these search arguments, "
+                                          "even after a fallback search with the plain toponym as 'q'. The toponym "
+                                          "may not exist in GeoNames under this name; try a different spelling or "
+                                          "a coarser containing place."
                         )]
                     ))
                     # remove by name: object equality fails because search() adds the
@@ -68,6 +106,7 @@ class GeoNamesAPI:
                 )
                 candidate_generation_output.toponyms_with_candidates.append(toponym_with_candidates)
             for duplicate_toponym in correct_duplicates:
+                duplicate_resolved = False
                 for toponym_with_candidates in candidate_generation_output.toponyms_with_candidates:
                     if toponym_with_candidates.toponym_with_search_arguments.toponym.casefold() == duplicate_toponym.duplicate_of.casefold():
                         candidate_generation_output.toponyms_with_candidates.append(
@@ -78,7 +117,26 @@ class GeoNamesAPI:
                                 nof_retrieved_candidates=toponym_with_candidates.nof_retrieved_candidates
                             )
                         )
+                        duplicate_resolved = True
                         break
+                if not duplicate_resolved:
+                    # The referenced toponym has no candidates (e.g. zero search hits),
+                    # so this duplicate would silently lose coverage: flag it for the
+                    # critic so the actor generates own search arguments for it.
+                    candidate_generation_output.invalid_toponyms.append(ToponymSearchArgumentsWithErrors(
+                        **duplicate_toponym.model_dump(),
+                        errors_per_toponym=[Error(
+                            execution_step=ExecutionStep.GEOAPI,
+                            error_message=f"This toponym was marked as a duplicate of "
+                                          f"'{duplicate_toponym.duplicate_of}', but no candidates could be "
+                                          f"retrieved for that toponym. Generate own search arguments for this "
+                                          f"toponym instead of marking it as a duplicate."
+                        )]
+                    ))
+                    candidate_generation_output.duplicate_toponyms = [
+                        topo for topo in candidate_generation_output.duplicate_toponyms
+                        if topo.toponym.casefold() != duplicate_toponym.toponym.casefold()
+                    ]
             return candidate_generation_output
         except Exception as e:
             candidate_generation_output.fatal_errors = [Error(execution_step=ExecutionStep.GEOAPI,

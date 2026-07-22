@@ -2,6 +2,7 @@ import copy
 import json
 import re
 import itertools
+from statistics import median
 from typing import Any
 
 import pycountry
@@ -221,12 +222,35 @@ class SearchParameterSyntaxValidator:
         ]
         self.continent_codes = ['AF', 'AS', 'EU', 'NA', 'OC', 'SA', 'AN']
 
+    BOOLEAN_PARAMS = ['isNameRequired']
+    INTEGER_PARAMS = ['maxRows', 'startRow']
+
+    @classmethod
+    def normalize(cls, params):
+        """Coerce obvious type slips in the generated parameters in place, so they
+        do not have to be round-tripped through the critic: string booleans
+        ('true'/'false'), numeric strings for integer parameters, and lowercase
+        style values."""
+        if not isinstance(params, dict):
+            return
+        for param in cls.BOOLEAN_PARAMS:
+            value = params.get(param)
+            if isinstance(value, str) and value.strip().lower() in ("true", "false"):
+                params[param] = value.strip().lower() == "true"
+        for param in cls.INTEGER_PARAMS:
+            value = params.get(param)
+            if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+                params[param] = int(value)
+        if isinstance(params.get('style'), str):
+            params['style'] = params['style'].upper()
+
     def validate(self, params) -> tuple[bool, list[str]]:
         """
         Validate the syntax of the GeoNames API parameters
         :param params: dict
         :return: tuple[bool, list[str]] - (is_valid, errors)
         """
+        self.normalize(params)
         self.params = params
         self.errors = []
         self.validate_required_params()
@@ -520,6 +544,11 @@ class ArticleSyntaxValidator:
 
 class ResolutionSyntaxValidator:
 
+    def __init__(self, max_distance_to_other_locations_km: float = 1000.0):
+        # Threshold for the geographic coherence check: a selected candidate farther
+        # than this from the median position of the other resolved places is flagged.
+        self.max_distance_to_other_locations_km = max_distance_to_other_locations_km
+
     def validate_resolution(self, state: GeoCodingState) -> GeoCodingState:
         """
         Validate the syntax of the resolved toponyms
@@ -538,13 +567,21 @@ class ResolutionSyntaxValidator:
                 for valid_toponym in state.valid_geocoded_toponyms:
                     temp_gt_toponyms.remove(valid_toponym.toponym)
 
-            # geonameIds of the retrieved candidates per toponym, to verify that the
-            # selected candidate actually references one of them
-            candidate_ids_per_toponym = {
-                toponym.toponym_with_search_arguments.toponym.casefold():
-                    [candidate["geonameId"] for candidate in toponym.candidates if "geonameId" in candidate]
+            # Retrieved candidates per toponym, to verify that the selected candidate
+            # actually references one of them and to check geographic coherence
+            candidates_per_toponym = {
+                toponym.toponym_with_search_arguments.toponym.casefold(): {
+                    candidate["geonameId"]: candidate
+                    for candidate in toponym.candidates if "geonameId" in candidate
+                }
                 for toponym in state.toponyms_with_candidates
             }
+
+            def _selected_candidate(resolved_toponym):
+                if not isinstance(resolved_toponym.toponym, str) or not resolved_toponym.selected_candidate_geonameId:
+                    return None
+                candidates = candidates_per_toponym.get(resolved_toponym.toponym.casefold())
+                return candidates.get(resolved_toponym.selected_candidate_geonameId) if candidates else None
 
             # Copy resolved toponyms
             resolved_toponyms = state.geocoded_toponyms.copy()
@@ -560,17 +597,18 @@ class ResolutionSyntaxValidator:
                         resolved_toponym.selected_candidate_geonameId):
                     errors.append("Selected candidate geonameId must be an integer.")
                 elif resolved_toponym.selected_candidate_geonameId and isinstance(resolved_toponym.toponym, str):
-                    candidate_ids = candidate_ids_per_toponym.get(resolved_toponym.toponym.casefold())
-                    if candidate_ids is not None and resolved_toponym.selected_candidate_geonameId not in candidate_ids:
+                    candidates = candidates_per_toponym.get(resolved_toponym.toponym.casefold())
+                    if candidates is not None and resolved_toponym.selected_candidate_geonameId not in candidates:
                         errors.append(
                             f"Selected candidate geonameId {resolved_toponym.selected_candidate_geonameId} does not "
                             f"reference any of the retrieved candidates for this toponym. Copy the geonameId "
-                            f"exactly from one of the candidates: {candidate_ids}. If none of them matches the "
+                            f"exactly from one of the candidates: {list(candidates)}. If none of them matches the "
                             f"toponym, select null.")
                 return errors
 
             # Validate resolved toponyms
             remaining_toponyms = temp_gt_toponyms[:]
+            accepted_resolutions = []
             for resolved_toponym in resolved_toponyms:
                 errors = _validate_resolved_toponym(resolved_toponym)
 
@@ -595,7 +633,52 @@ class ResolutionSyntaxValidator:
                         )]
                     ))
                 else:
-                    state.valid_geocoded_toponyms.append(resolved_toponym)
+                    accepted_resolutions.append(resolved_toponym)
+
+            # Geographic coherence: flag newly accepted selections lying far away from
+            # the median position of the other resolved places. Admin-level candidates
+            # (fcl 'A', e.g. countries and regions) are excluded both as reference
+            # points and from being flagged, since articles legitimately mention
+            # distant administrative context.
+            reference_points = []
+            for resolved_toponym in state.valid_geocoded_toponyms + accepted_resolutions:
+                candidate = _selected_candidate(resolved_toponym)
+                if candidate and candidate.get("fcl") != "A":
+                    try:
+                        reference_points.append((resolved_toponym.toponym.casefold(),
+                                                 float(candidate["lat"]), float(candidate["lng"])))
+                    except (TypeError, ValueError, KeyError):
+                        continue
+            # The median over ALL non-admin points (including the tested one) is robust
+            # against a single outlier, whereas excluding the tested point would let an
+            # outlier drag the reference midpoint when only few places are resolved.
+            for resolved_toponym in accepted_resolutions[:]:
+                candidate = _selected_candidate(resolved_toponym)
+                if not candidate or candidate.get("fcl") == "A":
+                    continue
+                if len(reference_points) < 3:
+                    continue
+                try:
+                    own_position = (float(candidate["lat"]), float(candidate["lng"]))
+                except (TypeError, ValueError, KeyError):
+                    continue
+                median_position = (median(lat for _, lat, _ in reference_points),
+                                   median(lng for _, _, lng in reference_points))
+                distance = geodesic(own_position, median_position).kilometers
+                if distance > self.max_distance_to_other_locations_km:
+                    accepted_resolutions.remove(resolved_toponym)
+                    state.invalid_geocoded_toponyms.append(ResolvedToponymWithErrors(
+                        **resolved_toponym.model_dump(),
+                        errors=[Error(
+                            execution_step=ExecutionStep.RESOLUTIONSYNTAXVALIDATOR,
+                            error_message=f"The selected candidate lies about {distance:.0f} km away from the "
+                                          f"other locations resolved for this article, which suggests a wrong "
+                                          f"disambiguation. Reconsider the candidates using the article context; "
+                                          f"if none fits, select null."
+                        )]
+                    ))
+
+            state.valid_geocoded_toponyms.extend(accepted_resolutions)
 
             # Add unresolved toponyms to invalid list
             for toponym in remaining_toponyms:

@@ -32,3 +32,11 @@ The code is structured as follows:
 ### Running the Code
 The main module is the `georelating.py` file, which contains the main function to run the Georelating experiments.
 If you want to run candidate generation or resolution separately, you can use the `geocoding.py` files.
+
+### Demo API with map UI
+`demo/` contains a FastAPI app exposing the pipeline as an API plus a Leaflet map frontend
+(select a GANDR article or paste your own report, optionally with structured LLM output):
+```bash
+uvicorn demo.server:app --host 127.0.0.1 --port 8123   # then open http://localhost:8123
+```
+See `demo/DEPLOYMENT.md` for running it on a (GPU) server.

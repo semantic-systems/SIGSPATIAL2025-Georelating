@@ -10,9 +10,10 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 
 
-# API configuration
-BASE_URL = "https://chat-ai.academiccloud.de/v1"
+# API configuration; CHATAI_BASE_URL allows pointing the pipeline at any
+# OpenAI-compatible endpoint (e.g. a local vLLM server on a GPU machine)
 load_dotenv()
+BASE_URL = os.getenv("CHATAI_BASE_URL", "https://chat-ai.academiccloud.de/v1")
 
 class ChatAIHandler:
     def __init__(self, base_url=BASE_URL):
@@ -61,12 +62,20 @@ class ChatAIHandler:
             raise ValueError(f"Model {model_name} is not available. \n"
                              f"Please choose from the following models: {self.available_models}")
         else:
-            return ChatOpenAI(api_key=self.api_key,
-                              base_url=self.base_url,
-                              max_retries=1,
-                              timeout=httpx.Timeout(500.0),
-                              model_name=model_name,
-                              temperature=0)
+            kwargs = dict(api_key=self.api_key,
+                          base_url=self.base_url,
+                          max_retries=1,
+                          timeout=httpx.Timeout(500.0),
+                          model_name=model_name,
+                          temperature=0)
+            # Hybrid "thinking" models (e.g. Qwen3.x) emit <think>...</think> reasoning
+            # by default, which makes this pipeline very slow. When self-hosting such a
+            # model, set LLM_DISABLE_THINKING=true to force non-thinking mode via the
+            # OpenAI-compatible `chat_template_kwargs` field (understood by vLLM). The
+            # flag is only sent when enabled, so the default ChatAI path is unchanged.
+            if os.getenv("LLM_DISABLE_THINKING", "false").strip().lower() in ("1", "true", "yes"):
+                kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+            return ChatOpenAI(**kwargs)
                               #top_p=top_p)
 
     def get_embedding_model(self, model_name="e5-mistral-7b-instruct") -> OpenAIEmbeddings:

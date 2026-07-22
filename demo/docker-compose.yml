@@ -1,0 +1,61 @@
+# Optional one-command startup for BOTH the vLLM model server and the demo app.
+# Run from the demo/ directory:  docker compose up -d --build
+#
+# Requires: Docker with the NVIDIA Container Toolkit, and a `.env` in the repo
+# root (see demo/.env.example). GPU 1 is pinned because the other GPUs on this
+# server are in use — change device_ids if your free GPU differs.
+#
+# NOTE: with compose, the demo reaches vLLM via the service name, so set
+#       CHATAI_BASE_URL=http://vllm:8000/v1 in your .env.
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: georelating-vllm
+    ipc: host
+    command: >
+      --model ${VLLM_MODEL:-Qwen/Qwen3.6-35B-A3B-FP8}
+      --served-model-name ${DEMO_ACTOR_MODEL:-georelating-llm}
+      --enable-prefix-caching
+      --max-model-len 16384
+      --gpu-memory-utilization 0.85
+      --tensor-parallel-size 1
+    volumes:
+      - ${HF_CACHE:-~/.cache/huggingface}:/root/.cache/huggingface
+    ports:
+      - "8000:8000"          # remove to keep vLLM private to the compose network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']   # <-- the free GPU from your nvidia-smi
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 30
+      start_period: 600s     # model download + load can take a while the first time
+    restart: unless-stopped
+
+  demo:
+    build:
+      context: ..              # repo root, so the whole project is in context
+      dockerfile: demo/Dockerfile
+    container_name: georelating-demo
+    env_file:
+      - ../.env
+    environment:
+      # keep the demo app off the GPU; the LLM work happens in the vllm service
+      CUDA_VISIBLE_DEVICES: ""
+    volumes:
+      - ../.env:/app/.env:ro
+      - ../output:/app/output          # persist invocation log + toponym cache
+      - ${HF_CACHE:-~/.cache/huggingface}:/models/hf
+    ports:
+      - "127.0.0.1:8123:8123"          # bind to localhost; reach it via SSH tunnel
+    depends_on:
+      vllm:
+        condition: service_healthy
+    restart: unless-stopped

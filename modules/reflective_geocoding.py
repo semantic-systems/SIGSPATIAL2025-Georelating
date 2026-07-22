@@ -32,13 +32,20 @@ class ReflectiveGeoCoder:
                  call_times: list = None,
                  skip_few_shot_loader: bool = False,
                  data_set: str = 'LGL',
-                 rate_limiter=None):
+                 rate_limiter=None,
+                 use_structured_output: bool = False):
         load_dotenv()
         self.working_memory = WorkingMemory(skip_few_shot_loader=skip_few_shot_loader)
         self.data_handler = self.working_memory.few_shot_handler.data_handler
         self.llm_handler = ChatAIHandler()
         self.llm = self.llm_handler.get_model(actor_model_name)
         self.critic_llm = self.llm_handler.get_model(critic_model_name)
+        # Optionally enforce valid JSON from the actors via the API's structured
+        # output mode (critics produce free text and are never constrained).
+        # Caveat: in json_object mode some models tend to emit a single object
+        # where the prompt asks for an array; the validators catch this.
+        self.use_structured_output = use_structured_output
+        self.actor_llm = self.llm.bind(response_format={"type": "json_object"}) if use_structured_output else self.llm
         self.validator = ArticleSyntaxValidator()
         self.geonames = GeoNamesAPI()
         self.output_parser = OutputParser()
@@ -99,7 +106,7 @@ class ReflectiveGeoCoder:
             prompt = state.reflected_prompt
 
         try:
-            llm_answer = self._invoke_llm(self.llm, prompt)
+            llm_answer = self._invoke_llm(self.actor_llm, prompt)
 
             if isinstance(llm_answer, APIStatusError):
                 return LLMOutput(
@@ -218,7 +225,7 @@ class ReflectiveGeoCoder:
             prompt = state.resolution_reflected_prompt
 
         try:
-            resolution_output = self._invoke_llm(self.llm, prompt)
+            resolution_output = self._invoke_llm(self.actor_llm, prompt)
             if isinstance(resolution_output, APIStatusError):
                 state.resolution_fatal_errors.append(Error(
                     execution_step=ExecutionStep.RESOLUTION_ACTOR,
@@ -323,7 +330,7 @@ class ReflectiveGeoCoder:
             prompt = state.georelating_reflected_prompt
 
         try:
-            georelating_output = self._invoke_llm(self.llm, prompt)
+            georelating_output = self._invoke_llm(self.actor_llm, prompt)
             if isinstance(georelating_output, APIStatusError):
                 state.georelating_fatal_errors.append(Error(
                     execution_step=ExecutionStep.GEORELATING_ACTOR,

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Georelating Demo · AIX Leuphana</title>
+<link rel="icon" href="/static/assets/favicon.ico">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --c-jaspis: #7B0E30;
+    --c-granit: #73786E;
+    --c-granit-80: #92968E;
+    --c-granit-60: #B9BBB6;
+    --c-granit-40: #DCDDDB;
+    --c-granit-20: #F1F1F0;
+    --c-orange: #FD892D;
+    --c-hellorange: #FBBC43;
+    --c-gelb: #FFE985;
+    --c-gruen: #B8D590;
+    --c-blau: #65B2CE;
+    --bg-primary: #ffffff;
+    --bg-secondary: var(--c-granit-20);
+    --text-primary: #1a1a1a;
+    --text-secondary: #73786E;
+    --font-body: 'Roboto Condensed', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --font-head: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); background: var(--bg-primary); color: var(--text-primary); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3, h4 { font-family: var(--font-head); font-weight: 700; color: var(--c-jaspis); margin-top: 0; }
+  a { color: var(--c-jaspis); text-decoration: none; transition: color .2s ease; }
+  a:hover { color: var(--c-orange); }
+  .wrapper { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+  /* Header */
+  .site-header { background: rgba(255,255,255,.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid var(--c-granit-40); padding: 12px 0; }
+  .site-header .wrapper { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand img { height: 34px; }
+  .brand .divider { width: 1px; height: 26px; background: var(--c-granit-40); }
+  .brand .demo-name { font-family: var(--font-head); font-weight: 500; color: var(--text-primary); font-size: 1rem; }
+  .site-header nav a { font-family: var(--font-head); font-weight: 500; color: var(--text-primary); font-size: .95rem; margin-left: 20px; }
+  .site-header nav a:hover { color: var(--c-jaspis); }
+
+  /* Hero */
+  .hero { background: linear-gradient(135deg, var(--c-granit-20) 0%, var(--bg-primary) 100%); border-bottom: 1px solid var(--c-granit-40); padding: 46px 0 40px; }
+  .hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: center; }
+  .hero h1 { font-size: 2.6rem; letter-spacing: -.5px; margin-bottom: 10px; }
+  .hero .lead { font-size: 1.15rem; color: var(--text-secondary); margin: 0 0 18px; }
+  .tldr { background: var(--bg-primary); border-left: 3px solid var(--c-jaspis); border-radius: 0 8px 8px 0; padding: .85rem 1.15rem; margin: 0 0 20px; font-size: .95rem; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+  .tldr strong { color: var(--c-jaspis); }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; background: var(--c-jaspis); color: #fff; font-family: var(--font-head); font-weight: 500; font-size: .9rem; border: 0; border-radius: 8px; cursor: pointer; box-shadow: 0 3px 6px rgba(123,14,48,.2); transition: background .2s, transform .2s, box-shadow .2s; }
+  .btn:hover { background: var(--c-orange); color: #fff; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(253,137,45,.3); }
+  .btn.secondary { background: transparent; color: var(--c-jaspis); border: 2px solid var(--c-jaspis); box-shadow: none; padding: 7px 14px; }
+  .btn.secondary:hover { background: var(--c-granit-20); color: var(--c-jaspis); border-color: var(--c-jaspis); transform: translateY(-2px); }
+  .hero figure { margin: 0; }
+  .hero figure img { width: 100%; border-radius: 10px; box-shadow: 0 6px 28px rgba(0,0,0,.12); display: block; }
+  .hero figcaption { font-size: .78rem; color: var(--text-secondary); margin-top: .6rem; line-height: 1.5; }
+
+  /* App */
+  .app { display: flex; gap: 22px; padding: 28px 0; align-items: stretch; }
+  .card { background: var(--bg-primary); border: 1px solid var(--c-granit-40); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,.05); }
+  #controls { width: 430px; min-width: 340px; padding: 20px; overflow-y: auto; max-height: 80vh; }
+  #map { flex: 1; min-height: 560px; border-radius: 12px; border: 1px solid var(--c-granit-40); overflow: hidden; }
+  label { display: block; font-family: var(--font-head); font-size: .8rem; font-weight: 500; margin: 12px 0 5px; color: var(--text-primary); }
+  select, textarea { width: 100%; padding: 9px; border: 1px solid var(--c-granit-40); border-radius: 8px; font: inherit; font-size: .9rem; background: #fff; }
+  select:focus, textarea:focus { outline: none; border-color: var(--c-jaspis); }
+  textarea { height: 120px; resize: vertical; }
+  .run-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .checkbox { font-size: .85rem; display: flex; gap: 6px; align-items: center; color: var(--text-secondary); cursor: pointer; }
+  #run { font-size: .95rem; padding: 10px 22px; }
+  #run:disabled { background: var(--c-granit-60); box-shadow: none; cursor: wait; transform: none; }
+
+  /* Progress stepper */
+  #progress { margin-top: 18px; padding: 16px; background: var(--c-granit-20); border-radius: 10px; }
+  .stepper { display: flex; flex-direction: column; gap: 2px; }
+  .step { display: flex; align-items: center; gap: 11px; padding: 7px 4px; font-size: .9rem; color: var(--text-secondary); position: relative; }
+  .step .dot { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--c-granit-60); background: #fff; display: flex; align-items: center; justify-content: center; font-size: .7rem; color: #fff; transition: all .3s; }
+  .step:not(:last-child) .dot::after { content: ''; position: absolute; left: 13px; top: 30px; width: 2px; height: 14px; background: var(--c-granit-60); }
+  .step.done { color: var(--text-primary); }
+  .step.done .dot { background: var(--c-jaspis); border-color: var(--c-jaspis); }
+  .step.done .dot::after { background: var(--c-jaspis); }
+  .step.active { color: var(--c-jaspis); font-weight: 700; }
+  .step.active .dot { border-color: var(--c-jaspis); box-shadow: 0 0 0 4px rgba(123,14,48,.15); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(123,14,48,.12); } 50% { box-shadow: 0 0 0 6px rgba(123,14,48,.05); } }
+  .step .step-label { flex: 1; }
+  .step .step-time { font-size: .78rem; font-weight: 400; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  #progress-note { margin-top: 10px; font-size: .82rem; color: var(--c-orange); font-weight: 500; min-height: 1.1em; }
+  #elapsed { margin-top: 6px; font-size: .82rem; color: var(--text-primary); font-weight: 500; }
+
+  #status { margin-top: 12px; font-size: .85rem; color: var(--text-secondary); min-height: 1.2em; }
+  #status.error { color: var(--c-jaspis); font-weight: 500; }
+
+  section.result { margin-top: 16px; border-top: 1px solid var(--c-granit-40); padding-top: 12px; }
+  section.result h2 { font-family: var(--font-head); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); margin: 0 0 8px; }
+  .georelated-box { background: var(--c-granit-20); border: 1.5px solid var(--c-orange); border-radius: 10px; padding: 12px 14px; }
+  .stat { display: flex; justify-content: space-between; gap: 10px; font-size: .88rem; padding: 3px 0; }
+  .stat span { color: var(--text-secondary); }
+  .stat b { font-variant-numeric: tabular-nums; color: var(--text-primary); }
+  .legend { font-size: .76rem; color: var(--text-secondary); margin-top: 10px; line-height: 1.9; }
+  .legend i { display: inline-block; width: 13px; height: 13px; margin-right: 5px; vertical-align: -2px; border-radius: 2px; }
+  .chip { display: inline-block; background: var(--c-granit-20); border: 1px solid var(--c-granit-40); border-radius: 20px; padding: 3px 11px; margin: 2px; font-size: .8rem; }
+  .chip.geocoded { background: #edf6e8; border-color: var(--c-gruen); color: #3d5a2a; }
+  table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  thead tr { background: var(--c-granit-20); }
+  th, td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--c-granit-40); }
+  th { font-family: var(--font-head); font-weight: 500; color: var(--text-secondary); font-size: .72rem; text-transform: uppercase; }
+  #errors { margin: 0; padding-left: 18px; }
+  #errors li { font-size: .78rem; color: #8a4a00; margin-bottom: 5px; }
+  .hidden { display: none !important; }
+
+  /* Footer */
+  .site-footer { background: var(--c-granit); color: #fff; padding: 34px 0 22px; margin-top: 20px; }
+  .site-footer .wrapper { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+  .site-footer a { color: var(--c-granit-20); }
+  .site-footer a:hover { color: var(--c-gelb); }
+  .site-footer .about { max-width: 460px; font-size: .88rem; }
+  .site-footer h4 { color: #fff; font-size: 1rem; margin-bottom: 8px; }
+  .footer-links { list-style: none; padding: 0; margin: 0; font-size: .88rem; }
+  .footer-links li { margin-bottom: 6px; }
+  .copyright { text-align: center; font-size: .82rem; color: var(--c-granit-60); border-top: 1px solid rgba(255,255,255,.12); margin-top: 22px; padding-top: 16px; }
+
+  @media (max-width: 900px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .app { flex-direction: column; }
+    #controls { width: 100%; max-height: none; }
+    #map { min-height: 460px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrapper">
+    <a class="brand" href="https://aix.leuphana.de" target="_blank" rel="noopener">
+      <img src="/static/assets/logo.svg" alt="AIX — Leuphana University">
+      <span class="divider"></span>
+      <span class="demo-name">Georelating Demo</span>
+    </a>
+    <nav>
+      <a href="https://semantic-systems.github.io/SIGSPATIAL2025-Georelating/" target="_blank" rel="noopener">Publication</a>
+      <a href="https://github.com/semantic-systems/SIGSPATIAL2025-Georelating" target="_blank" rel="noopener">Code</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrapper hero-grid">
+    <div>
+      <h1>Georelating Disaster Reports</h1>
+      <p class="lead">Locating events from natural-language reports with reflective LLM agents by inferring the affected area as a Discrete Global Grid System (DGGS) cell.</p>
+      <div class="tldr">
+        Accurately identifying disaster-affected areas is crucial for disaster resilience. In response, we introduce Georelating, a novel task that infers affected areas from textual reports containing complex locative expressions, moving beyond traditional geoparsing approaches that rely on explicit point locations. Georelating instead combines resolving unnamed regions and reasoning about spatial relations to represent event-affected areas within DGGSs.
+        We propose addressing Georelating with a pipeline capitalizing on the contextual understanding of LLM agents to perform geospatial reasoning. Given a disaster report, the pipeline recognizes toponyms, geocodes them against GeoNames in a reflective actor–critic workflow, then reasons over the spatial relations in the text to estimate the affected area, represented as an H3 DGGS cell and drawn on the map.
+      </div>
+      <div class="links">
+        <a class="btn" href="https://doi.org/10.1145/3748636.3762733" target="_blank" rel="noopener">Georelating Paper (SIGSPATIAL '25)</a>
+        <a class="btn" href="https://doi.org/10.1145/3764912.3770819" target="_blank" rel="noopener">GANDR Paper (GeoAI @SIGSPATIAL '25)</a>
+        <a class="btn" href="https://doi.org/10.5281/zenodo.15612556" target="_blank" rel="noopener">GANDR Dataset (Zenodo)</a>
+        <a class="btn secondary" href="https://semantic-systems.github.io/SIGSPATIAL2025-Georelating/" target="_blank" rel="noopener">Project page</a>
+        <a class="btn secondary" href="https://github.com/semantic-systems/SIGSPATIAL2025-Georelating" target="_blank" rel="noopener">Code</a>
+      </div>
+    </div>
+    <figure>
+      <img src="/static/assets/georelating_overview.png" alt="Georelating parses a disaster report to a DGGS cell by interpreting spatial relations and landmark toponyms.">
+      <figcaption><strong>Georelating</strong> parses a disaster's impact area described in text to a DGGS cell by interpreting complex locative expressions — spatial relations (e.g. "between") and landmark toponyms.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<main class="wrapper app">
+  <div id="controls" class="card">
+    <label for="article">GANDR sample article</label>
+    <select id="article"><option value="">— select a sample report —</option></select>
+
+    <label for="text">… or paste your own disaster report</label>
+    <textarea id="text" placeholder="The first line is treated as the title. Describe a disaster with locative expressions, e.g. 'A landslide occurred 1 km north of Yaiza, Lanzarote …'"></textarea>
+
+    <div class="run-row">
+      <button id="run" class="btn">Georelate</button>
+      <label class="checkbox" title="Constrain actor LLM calls to valid JSON via the API's structured-output mode">
+        <input type="checkbox" id="structured"> structured output
+      </label>
+    </div>
+
+    <div id="progress" class="hidden">
+      <div class="stepper" id="stepper"></div>
+      <div id="progress-note"></div>
+      <div id="elapsed"></div>
+    </div>
+
+    <div id="status"></div>
+
+    <section id="result-georelated" class="result hidden">
+      <h2>Georelated area</h2>
+      <div class="georelated-box">
+        <div class="stat"><span>Center coordinates</span><b id="r-center"></b></div>
+        <div class="stat"><span>Estimated area</span><b id="r-area"></b></div>
+        <div class="stat"><span>H3 cell (size heuristic)</span><b id="r-cell"></b></div>
+        <div class="stat"><span>H3 covering cell (Def. 1)</span><b id="r-cover"></b></div>
+      </div>
+      <div class="legend">
+        <div><i style="background:#7B0E3033;border:1px solid #7B0E30"></i> heuristic cell (matches size)</div>
+        <div><i style="background:transparent;border:2px dashed #FD892D"></i> covering cell (smallest fully enclosing)</div>
+        <div><i style="background:#65B2CE44;border:1px solid #65B2CE"></i> predicted affected area</div>
+      </div>
+    </section>
+
+    <section id="result-toponyms" class="result hidden">
+      <h2>Toponyms <span style="font-weight:400;text-transform:none;color:var(--c-gruen)">(green = geocoded)</span></h2>
+      <div id="r-toponyms"></div>
+    </section>
+
+    <section id="result-relations" class="result hidden">
+      <h2>Spatial relations considered</h2>
+      <table id="r-relations"><thead>
+        <tr><th>Expression</th><th>Landmark</th><th>Relation</th><th>km</th></tr>
+      </thead><tbody></tbody></table>
+    </section>
+
+    <section id="result-errors" class="result hidden">
+      <h2>Pipeline notes &amp; errors</h2>
+      <ul id="errors"></ul>
+    </section>
+  </div>
+  <div id="map"></div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrapper">
+    <div class="about">
+      <h4>AIX — Artificial Intelligence &amp; Explainability</h4>
+      <p>A research group led by Prof. Dr. Ricardo Usbeck at Leuphana University Lüneburg, focusing on neuro-symbolic AI for explainable and responsible real-world solutions.</p>
+    </div>
+    <div>
+      <h4>Georelating</h4>
+      <ul class="footer-links">
+        <li><a href="https://doi.org/10.1145/3748636.3762733" target="_blank" rel="noopener">Paper (SIGSPATIAL '25)</a></li>
+        <li><a href="https://doi.org/10.5281/zenodo.15612556" target="_blank" rel="noopener">GANDR dataset (Zenodo)</a></li>
+        <li><a href="https://github.com/semantic-systems/SIGSPATIAL2025-Georelating" target="_blank" rel="noopener">Source code</a></li>
+        <li><a href="https://aix.leuphana.de" target="_blank" rel="noopener">AIX group website</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="copyright">© <span id="year"></span> AIX Research Group — Leuphana University Lüneburg</div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.getElementById('year').textContent = new Date().getFullYear();
+const map = L.map('map').setView([30, 0], 2);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  { maxZoom: 18, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+let overlay = L.layerGroup().addTo(map);
+
+const $ = id => document.getElementById(id);
+const setStatus = (msg, isError = false) => { $('status').textContent = msg; $('status').className = isError ? 'error' : ''; };
+
+let STAGES = [];
+async function loadConfig() {
+  try {
+    const cfg = await (await fetch('/api/config')).json();
+    STAGES = cfg.stages;
+    $('stepper').innerHTML = STAGES.map(s =>
+      `<div class="step" data-key="${s.key}"><span class="dot"></span><span class="step-label">${s.label}</span><span class="step-time"></span></div>`).join('');
+  } catch (e) { /* stepper is optional */ }
+}
+async function loadArticles() {
+  try {
+    const articles = await (await fetch('/api/articles')).json();
+    for (const a of articles) {
+      const opt = document.createElement('option');
+      opt.value = a.landmark_id;
+      opt.textContent = `#${a.landmark_id} — ${a.title.slice(0, 68)}`;
+      $('article').appendChild(opt);
+    }
+  } catch (e) { setStatus('Could not load article list: ' + e, true); }
+}
+loadConfig();
+loadArticles();
+
+$('article').addEventListener('change', async () => {
+  const id = $('article').value;
+  if (!id) return;
+  const article = await (await fetch('/api/articles/' + id)).json();
+  $('text').value = '';
+  $('text').placeholder = article.title + '\n\n' + article.text.slice(0, 380) + ' …';
+});
+
+function updateStepper(progress) {
+  if (!progress || !STAGES.length) return;
+  const idx = progress.current_index ?? 0;
+  document.querySelectorAll('.step').forEach((el, i) => {
+    el.classList.toggle('done', i < idx);
+    el.classList.toggle('active', i === idx);
+    el.querySelector('.dot').innerHTML = i < idx ? '✓' : '';
+  });
+  $('progress-note').textContent = progress.reflection_active
+    ? 'A critic is analysing the output and generating corrective feedback …' : '';
+}
+function finishStepper() {
+  document.querySelectorAll('.step').forEach(el => {
+    el.classList.remove('active'); el.classList.add('done');
+    el.querySelector('.dot').innerHTML = '✓';
+  });
+  $('progress-note').textContent = '';
+}
+function applyTiming(job) {
+  const byStage = {};
+  for (const s of (job.timeline || [])) if (s.duration_s != null) byStage[s.stage] = s.duration_s;
+  document.querySelectorAll('.step').forEach(el => {
+    const d = byStage[el.dataset.key];
+    el.querySelector('.step-time').textContent = (d != null) ? `${d}s` : '';
+  });
+  if (job.duration_s != null)
+    $('elapsed').textContent = `${job.status === 'completed' ? 'Completed' : 'Stopped'} in ${job.duration_s}s`;
+}
+
+$('run').addEventListener('click', async () => {
+  const body = { use_structured_output: $('structured').checked };
+  const text = $('text').value.trim();
+  if (text) body.text = text;
+  else if ($('article').value) body.article_id = parseInt($('article').value);
+  else { setStatus('Select a sample report or paste your own text first.', true); return; }
+
+  $('run').disabled = true;
+  for (const s of ['result-georelated', 'result-toponyms', 'result-relations', 'result-errors'])
+    $(s).classList.add('hidden');
+  overlay.clearLayers();
+  $('progress').classList.remove('hidden');
+  document.querySelectorAll('.step').forEach(el => { el.className = 'step'; el.querySelector('.dot').innerHTML = ''; });
+  $('progress-note').textContent = '';
+  setStatus('Submitted. The reflective pipeline runs several LLM calls per stage …');
+
+  try {
+    const { job_id } = await (await fetch('/api/georelate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    })).json();
+    const started = Date.now();
+    const poll = setInterval(async () => {
+      const job = await (await fetch('/api/jobs/' + job_id)).json();
+      const secs = Math.round((Date.now() - started) / 1000);
+      $('elapsed').textContent = `elapsed ${secs}s`;
+      updateStepper(job.progress);
+      if (job.status === 'completed') { clearInterval(poll); $('run').disabled = false; finishStepper(); applyTiming(job); render(job.result); }
+      else if (job.status === 'failed') { clearInterval(poll); $('run').disabled = false; applyTiming(job); setStatus(`Failed after ${job.duration_s ?? '?'}s: ${job.error}`, true); }
+      else if (!job.progress) setStatus(`${job.status} — initializing the pipeline …`);
+      else setStatus('Working …');
+    }, 2000);
+  } catch (e) { $('run').disabled = false; setStatus('Request failed: ' + e, true); }
+});
+
+function render(r) {
+  setStatus('Done — see the stage timings above and the result below.');
+  const bounds = [];
+
+  for (const t of r.geocoded_toponyms) {
+    const m = L.marker([t.latitude, t.longitude]).addTo(overlay);
+    m.bindPopup(`<b>${t.toponym}</b><br>${t.name ?? ''} (${t.feature ?? ''}, ${t.country ?? ''})<br>` +
+                `GeoNames ID: ${t.geonameId}<br><i>${(t.reasoning ?? '').slice(0, 220)}</i>`);
+    bounds.push([t.latitude, t.longitude]);
+  }
+
+  if (r.georelated) {
+    const c = r.georelated.center;
+    const radius = Math.sqrt(r.georelated.area_km2 * 1e6 / Math.PI);
+    L.circle([c.latitude, c.longitude], { radius, color: '#65B2CE', weight: 1, fillColor: '#65B2CE', fillOpacity: .25 }).addTo(overlay);
+    if (r.cells.pred_cell)
+      L.polygon(r.cells.pred_cell.boundary, { color: '#7B0E30', weight: 2, fillOpacity: .18 }).addTo(overlay)
+        .bindPopup(`heuristic cell ${r.cells.pred_cell.index} (res ${r.cells.pred_cell.resolution})`);
+    if (r.cells.pred_cell_covering)
+      L.polygon(r.cells.pred_cell_covering.boundary, { color: '#FD892D', weight: 2, dashArray: '6 6', fillOpacity: 0 }).addTo(overlay)
+        .bindPopup(`covering cell ${r.cells.pred_cell_covering.index} (res ${r.cells.pred_cell_covering.resolution})`);
+    bounds.push([c.latitude, c.longitude]);
+    for (const p of (r.cells.pred_cell_covering?.boundary ?? [])) bounds.push(p);
+
+    $('r-center').textContent = `${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}`;
+    $('r-area').textContent = `${r.georelated.area_km2} km²`;
+    $('r-cell').textContent = r.cells.pred_cell ? `${r.cells.pred_cell.index} (res ${r.cells.pred_cell.resolution})` : '—';
+    $('r-cover').textContent = r.cells.pred_cell_covering ? `${r.cells.pred_cell_covering.index} (res ${r.cells.pred_cell_covering.resolution})` : '—';
+    $('result-georelated').classList.remove('hidden');
+  } else {
+    setStatus('Pipeline finished, but no georelated area could be derived — see notes below.', true);
+  }
+
+  const geocoded = new Set(r.geocoded_toponyms.map(t => t.toponym));
+  $('r-toponyms').innerHTML = r.toponyms.map(t => `<span class="chip ${geocoded.has(t) ? 'geocoded' : ''}">${t}</span>`).join('');
+  $('result-toponyms').classList.remove('hidden');
+
+  const tbody = $('r-relations').querySelector('tbody');
+  tbody.innerHTML = '';
+  for (const rel of r.spatial_relations) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${rel.locative_expression ?? ''}</td><td>${rel.landmark ?? ''}</td>` +
+                   `<td>${rel.spatial_relation ?? ''}</td><td>${rel.distance_km ?? ''}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (r.spatial_relations.length) $('result-relations').classList.remove('hidden');
+
+  $('errors').innerHTML = (r.errors ?? []).map(e => `<li><b>${e.step}</b>: ${e.message}</li>`).join('');
+  if ((r.errors ?? []).length) $('result-errors').classList.remove('hidden');
+
+  if (bounds.length) { map.invalidateSize(); map.fitBounds(bounds, { padding: [40, 40] }); }
+}
+</script>
+</body>
+</html>

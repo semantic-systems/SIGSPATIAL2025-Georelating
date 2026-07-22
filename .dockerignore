@@ -1,0 +1,12 @@
+# Keep the demo image lean. IMPORTANT: do NOT ignore `.git/` or `data/` — several
+# modules call `git rev-parse --show-toplevel` at import time, and the pipeline loads
+# few-shot data and the corpus at startup.
+.venv/
+venv/
+**/__pycache__/
+*.pyc
+output/
+.idea/
+.claude/
+*.log
+.DS_Store
