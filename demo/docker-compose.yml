@@ -24,13 +24,12 @@ services:
       - ${HF_CACHE:-~/.cache/huggingface}:/root/.cache/huggingface
     ports:
       - "8000:8000"          # remove to keep vLLM private to the compose network
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['1']   # <-- the free GPU from your nvidia-smi
-              capabilities: [gpu]
+    # GPU access via CDI — this server has no nvidia Docker runtime, only CDI.
+    # Requires (root, one-time, non-disruptive): sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+    # If your host instead has the classic nvidia runtime, replace this block with the
+    # deploy.resources.reservations.devices form (driver: nvidia, device_ids: ['1']).
+    devices:
+      - "nvidia.com/gpu=1"   # <-- the free GPU from your nvidia-smi
     healthcheck:
       # python (always present in the vLLM image) — avoids depending on curl
       test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
