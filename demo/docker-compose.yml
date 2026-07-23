@@ -1,9 +1,11 @@
-# Optional one-command startup for BOTH the vLLM model server and the demo app.
-# Run from the demo/ directory:  docker compose up -d --build
+# One-command startup for BOTH the vLLM model server and the demo app (Path B in
+# DEPLOYMENT.md). Run from the demo/ directory, e.g.:
+#     GPU_ID=1 VLLM_HOST_PORT=8001 docker-compose up -d --build
+# (use "docker compose" if your host has the plugin instead of the hyphenated binary).
 #
-# Requires: Docker with the NVIDIA Container Toolkit, and a `.env` in the repo
-# root (see demo/.env.example). GPU 1 is pinned because the other GPUs on this
-# server are in use — change device_ids if your free GPU differs.
+# Requires: Docker with the NVIDIA Container Toolkit (CDI) — see DEPLOYMENT.md §B1 —
+# and a `.env` in the repo root (see demo/.env.example). GPU_ID selects the free GPU;
+# VLLM_HOST_PORT is the host port for vLLM (default 8001, since host 8000 is often taken).
 #
 # NOTE: with compose, the demo reaches vLLM via the service name, so set
 #       CHATAI_BASE_URL=http://vllm:8000/v1 in your .env.
@@ -17,19 +19,22 @@ services:
       --model ${VLLM_MODEL:-Qwen/Qwen3.6-35B-A3B-FP8}
       --served-model-name ${DEMO_ACTOR_MODEL:-georelating-llm}
       --enable-prefix-caching
+      --enforce-eager
       --max-model-len 16384
-      --gpu-memory-utilization 0.85
+      --gpu-memory-utilization 0.92
       --tensor-parallel-size 1
     volumes:
       - ${HF_CACHE:-~/.cache/huggingface}:/root/.cache/huggingface
     ports:
-      - "8000:8000"          # remove to keep vLLM private to the compose network
+      # host:container — host 8000 is often taken on a shared box, so default to 8001.
+      # (The demo reaches vLLM via the "vllm" service name, not this host port.)
+      - "${VLLM_HOST_PORT:-8001}:8000"
     # GPU access via CDI — this server has no nvidia Docker runtime, only CDI.
     # Requires (root, one-time, non-disruptive): sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
     # If your host instead has the classic nvidia runtime, replace this block with the
     # deploy.resources.reservations.devices form (driver: nvidia, device_ids: ['1']).
     devices:
-      - "nvidia.com/gpu=1"   # <-- the free GPU from your nvidia-smi
+      - "nvidia.com/gpu=${GPU_ID:-1}"   # <-- the free GPU index from your nvidia-smi
     healthcheck:
       # python (always present in the vLLM image) — avoids depending on curl
       test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
