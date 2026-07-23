@@ -32,11 +32,12 @@ services:
               device_ids: ['1']   # <-- the free GPU from your nvidia-smi
               capabilities: [gpu]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # python (always present in the vLLM image) — avoids depending on curl
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
       interval: 20s
       timeout: 5s
-      retries: 30
-      start_period: 600s     # model download + load can take a while the first time
+      retries: 60
+      start_period: 900s     # first start downloads ~35 GB + loads the model
     restart: unless-stopped
 
   demo:
@@ -52,7 +53,8 @@ services:
     volumes:
       - ../.env:/app/.env:ro
       - ../output:/app/output          # persist invocation log + toponym cache
-      - ${HF_CACHE:-~/.cache/huggingface}:/models/hf
+      # (Stanza + embedding models are baked into the image at build time, so no
+      #  HF cache mount is needed here — that would only shadow the baked models.)
     ports:
       - "127.0.0.1:8123:8123"          # bind to localhost; reach it via SSH tunnel
     depends_on:

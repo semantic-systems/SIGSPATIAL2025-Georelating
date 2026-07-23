@@ -364,11 +364,13 @@ if __name__ == "__main__":
     data_file = "gandr.json"
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
 
-    # llama-3.3-70b-instruct (actor) and mistral-large-instruct (critic) are no
-    # longer served by the ChatAI API; mistral-medium-3.5-128b is the closest
-    # currently available successor.
-    actor = "mistral-medium-3.5-128b"
-    critic = "gemma-4-31b-it"
+    # Model names are env-overridable so this batch script can target the same
+    # self-hosted vLLM endpoint as the demo (set GEORELATING_ACTOR_MODEL /
+    # GEORELATING_CRITIC_MODEL to the vLLM --served-model-name, e.g. "georelating-llm",
+    # and CHATAI_BASE_URL to the vLLM URL). The defaults are ChatAI models for the
+    # standalone research run. (llama-3.3-70b / mistral-large are no longer served.)
+    actor = os.getenv("GEORELATING_ACTOR_MODEL", "mistral-medium-3.5-128b")
+    critic = os.getenv("GEORELATING_CRITIC_MODEL", "gemma-4-31b-it")
     dataset = "New"
 
     # Get the project root directory (parent of modules/)

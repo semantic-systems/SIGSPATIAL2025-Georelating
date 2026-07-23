@@ -26,8 +26,9 @@ from modules.reflective_geocoding import ReflectiveGeoCoder
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GANDR_PATH = os.path.join(PROJECT_ROOT, "data", "gandr.json")
 
-DEFAULT_ACTOR = os.getenv("DEMO_ACTOR_MODEL", "mistral-medium-3.5-128b")
-DEFAULT_CRITIC = os.getenv("DEMO_CRITIC_MODEL", "mistral-medium-3.5-128b")
+# Default to the vLLM served-model-name from the deployment; override via env.
+DEFAULT_ACTOR = os.getenv("DEMO_ACTOR_MODEL", "georelating-llm")
+DEFAULT_CRITIC = os.getenv("DEMO_CRITIC_MODEL", "georelating-llm")
 GRAPH_RECURSION_LIMIT = 50
 MAX_TEXT_LENGTH = 8000
 

@@ -10,3 +10,6 @@ output/
 .claude/
 *.log
 .DS_Store
+# Never bake the ChatAI model-list cache into the image — the container must
+# re-fetch it from the vLLM /v1/models endpoint (which lists "georelating-llm").
+modules/available_models.json
