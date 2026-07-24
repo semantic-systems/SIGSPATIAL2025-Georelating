@@ -22,8 +22,9 @@ class GeoNamesAPI:
     # modest to stay within the GeoNames free webservice's per-second throttle.
     MAX_SEARCH_CONCURRENCY = 5
 
-    def search(self, params):
-        params.update({'username': os.getenv('GEONAMES_USERNAME')})
+    def search(self, params, username=None):
+        # Per-request GeoNames account (if supplied) overrides the server default.
+        params.update({'username': username or os.getenv('GEONAMES_USERNAME')})
         url = self.base_url + urllib.parse.urlencode(params)
         try:
             response = requests.get(url, timeout=self.REQUEST_TIMEOUT_S)
@@ -43,6 +44,8 @@ class GeoNamesAPI:
         try:
             topos_to_search = validated_output.valid_toponyms
             correct_duplicates = validated_output.duplicate_toponyms
+            # Optional per-request GeoNames account carried on the graph state.
+            geonames_username = getattr(validated_output, 'geonames_username', None)
             if hasattr(validated_output, 'reflection_phase'):
                 if validated_output.reflection_phase == ReflectionPhase.ACTOR_RETRY_ON_INVALID_TOPONYMS:
                     topos_to_search = [topo for topo in validated_output.valid_toponyms if topo.generated_by_retry]
@@ -51,7 +54,7 @@ class GeoNamesAPI:
                 """Search one toponym; on zero hits retry once with the plain toponym
                 as 'q'. Returns (toponym, response). Independent I/O per toponym, so
                 these run concurrently; only disjoint objects are touched."""
-                response = self.search(toponym_to_search_for.params)
+                response = self.search(toponym_to_search_for.params, username=geonames_username)
                 if not response['geonames']:
                     # Deterministic repair before involving the critic: no hits are
                     # usually caused by overly specific search arguments, so retry
@@ -62,7 +65,7 @@ class GeoNamesAPI:
                         'maxRows': (toponym_to_search_for.params or {}).get('maxRows', 10),
                         'type': 'json'
                     }
-                    response = self.search(fallback_params)
+                    response = self.search(fallback_params, username=geonames_username)
                     if response['geonames']:
                         # record the arguments that actually produced the candidates
                         toponym_to_search_for.params = fallback_params

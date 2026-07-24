@@ -1,3 +1,4 @@
+import os
 import threading
 from datetime import datetime
 
@@ -10,6 +11,24 @@ DAILY_RATE_LIMIT = 75000
 HOURLY_RATE_LIMIT = 3000
 MINUTE_RATE_LIMIT = 60
 SECOND_RATE_LIMIT = 2
+
+# GWDG's shared ChatAI endpoint (see chatAI.py's default CHATAI_BASE_URL) — the
+# multi-tenant quota below protects that shared service and must stay as-is
+# whenever it's the active endpoint. A self-hosted vLLM instance has no such
+# shared quota; it only needs a ceiling that guards against a runaway retry loop
+# hammering the server, so it gets a much higher one. Tune
+# SELF_HOSTED_LLM_RATE_LIMITS to match what your own GPUs sustain comfortably.
+CHATAI_HOSTED_URL = "https://chat-ai.academiccloud.de/v1"
+CHATAI_LLM_RATE_LIMITS = [(2, 1), (50, 60), (2700, 3600)]
+SELF_HOSTED_LLM_RATE_LIMITS = [(10, 1), (300, 60), (10000, 3600)]
+
+
+def default_llm_rate_limits(base_url: str = None) -> list:
+    """MultiWindowRateLimiter windows to use for the currently configured LLM endpoint."""
+    base_url = (base_url or os.getenv("CHATAI_BASE_URL", CHATAI_HOSTED_URL)).rstrip("/")
+    if base_url == CHATAI_HOSTED_URL.rstrip("/"):
+        return CHATAI_LLM_RATE_LIMITS
+    return SELF_HOSTED_LLM_RATE_LIMITS
 
 
 class MultiWindowRateLimiter:

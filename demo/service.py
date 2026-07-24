@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from agent_components.environment.external_tools import (get_h3_resolution_for_area,
                                                          smallest_covering_cell)
 from agent_components.environment.internal_tools import OutputParser
-from agent_components.llms.api_error_handler import MultiWindowRateLimiter
+from agent_components.llms.api_error_handler import MultiWindowRateLimiter, default_llm_rate_limits
 from models.candidates import GeoRelatingState
 from modules.georelating import extract_title_text_from_row, extract_toponyms_from_doc
 from modules.reflective_geocoding import ReflectiveGeoCoder
@@ -63,7 +63,7 @@ class GeorelatingService:
         load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
         self.actor_model = actor_model
         self.critic_model = critic_model
-        self.rate_limiter = MultiWindowRateLimiter([(2, 1), (50, 60), (2700, 3600)])
+        self.rate_limiter = MultiWindowRateLimiter(default_llm_rate_limits())
         self._lock = threading.Lock()
         self._graphs = {}      # use_structured_output -> (geocoder, compiled graph)
         self._nlp = None
@@ -140,10 +140,12 @@ class GeorelatingService:
     ####################################################################################################################
 
     def georelate(self, text: str = None, article_id: int = None,
-                  use_structured_output: bool = False, progress_callback=None) -> dict:
+                  use_structured_output: bool = False, geonames_username: str = None,
+                  progress_callback=None) -> dict:
         """Run the full pipeline for a GANDR article or user-provided text and
-        return a display-ready result document. ``progress_callback`` (optional)
-        receives a dict as the pipeline advances through its stages."""
+        return a display-ready result document. ``geonames_username`` (optional)
+        overrides the server's GeoNames account for this request. ``progress_callback``
+        (optional) receives a dict as the pipeline advances through its stages."""
         def _emit(stage, node=None, reflection=False):
             if progress_callback:
                 progress_callback({
@@ -176,6 +178,7 @@ class GeorelatingService:
             "article_title": title,
             "article_text": body,
             "toponyms": toponyms,
+            "geonames_username": (geonames_username or "").strip() or None,
         }
 
         # The display-only spatial-relation extraction needs only the report text

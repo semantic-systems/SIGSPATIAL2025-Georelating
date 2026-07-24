@@ -60,6 +60,11 @@ class GeorelateRequest(BaseModel):
     use_structured_output: bool = Field(default=False,
                                         description="Constrain actor LLM calls to valid JSON "
                                                     "via the API's structured output mode")
+    geonames_username: Optional[str] = Field(default=None, max_length=100,
+                                             description="Optional GeoNames account (public "
+                                                         "identifier) to use instead of the "
+                                                         "server default, to draw on your own "
+                                                         "GeoNames quota")
 
 
 def _job_source(request: GeorelateRequest) -> str:
@@ -100,6 +105,7 @@ def _run_job(job_id: str, request: GeorelateRequest):
         result = service.georelate(text=request.text,
                                    article_id=request.article_id,
                                    use_structured_output=request.use_structured_output,
+                                   geonames_username=request.geonames_username,
                                    progress_callback=on_progress)
         t_end = time.time()
         if timeline:

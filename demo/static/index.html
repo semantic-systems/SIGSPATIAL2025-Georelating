@@ -181,6 +181,11 @@
     <label for="text">… or paste your own disaster report</label>
     <textarea id="text" placeholder="The first line is treated as the title. Describe a disaster with locative expressions, e.g. 'A landslide occurred 1 km north of Yaiza, Lanzarote …'"></textarea>
 
+    <label for="geonames">GeoNames username <span style="font-weight:400;text-transform:none;color:var(--text-secondary)">(optional)</span></label>
+    <input id="geonames" type="text" autocomplete="off" spellcheck="false"
+           placeholder="uses the demo's account by default — enter your own to use your quota"
+           title="Optional. Your GeoNames account (a public username, not a password) so toponym look-ups draw on your own free-tier quota instead of the shared server account.">
+
     <div class="run-row">
       <button id="run" class="btn">Georelate</button>
       <label class="checkbox" title="Constrain actor LLM calls to valid JSON via the API's structured-output mode">
@@ -327,6 +332,8 @@ $('run').addEventListener('click', async () => {
   if (text) body.text = text;
   else if ($('article').value) body.article_id = parseInt($('article').value);
   else { setStatus('Select a sample report or paste your own text first.', true); return; }
+  const geonames = $('geonames').value.trim();
+  if (geonames) body.geonames_username = geonames;
 
   $('run').disabled = true;
   for (const s of ['result-georelated', 'result-toponyms', 'result-relations', 'result-errors'])

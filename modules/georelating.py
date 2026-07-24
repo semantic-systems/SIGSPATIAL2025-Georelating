@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
 from agent_components.environment.external_tools import safe_latlng_to_cell, safe_smallest_covering_cell
-from agent_components.llms.api_error_handler import MultiWindowRateLimiter
+from agent_components.llms.api_error_handler import MultiWindowRateLimiter, default_llm_rate_limits
 from models.candidates import GeoRelatingState
 from models.errors import ExecutionStep
 from modules.reflective_geocoding import ReflectiveGeoCoder
@@ -22,12 +22,9 @@ Configuration
 """
 
 MAX_WORKERS = 4
-# GWDG ChatAI rate limits, enforced per LLM call (see api_error_handler constants)
-LLM_RATE_LIMITS = [
-    (2, 1),        # 2 per second
-    (50, 60),      # 60 per minute
-    (2700, 3600),  # 3000 per hour
-]
+# Per-LLM-call throttle: GWDG ChatAI limits if CHATAI_BASE_URL points there,
+# else a higher self-hosted-vLLM ceiling (see api_error_handler.default_llm_rate_limits).
+LLM_RATE_LIMITS = default_llm_rate_limits()
 # The unified three-stage graph exceeds langgraph's default recursion limit of 25
 # when reflection loops fire in several stages.
 GRAPH_RECURSION_LIMIT = 50

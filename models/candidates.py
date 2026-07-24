@@ -61,6 +61,10 @@ class CandidateGenerationState(CandidateGenerationOutput):
                                default="")
     article_text: str = Field(description="The text of the article",
                               default="")
+    geonames_username: str | None = Field(
+        description="Optional GeoNames account for candidate retrieval; falls back to "
+                    "the GEONAMES_USERNAME environment variable when unset",
+        default=None)
     initial_prompt: str = Field(description="The prompt used to generate the output",
                                 default="")
     reflection_phase: ReflectionPhase = Field(description="The phase of the reflective candidate generation",
